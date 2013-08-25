@@ -1,0 +1,27 @@
+<html>
+    <head>
+        <title>Fr API Test</title>
+    </head>
+    <style type="text/css">
+        div {
+            float: left;
+            width: 300px;
+            border: 1px solid #999;
+            padding: 3px;
+            margin: 1px;
+        }
+        div:hover {
+            background: #eee
+        }
+    </style>
+    <body>
+        <div>
+            <p>Multipart test</p>
+            <form action="rest.php" method="post" enctype="multipart/form-data">
+                Method: <input name="method" type="text" value="test" /><br />
+                File: <input name="img" type="file" /><br />
+                <input type="submit" value="Submit" />
+            </form>
+        </div>
+    </body>
+</html>
