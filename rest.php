@@ -44,9 +44,42 @@
         
         function InitTable() {
             // $this->conn->query('CREATE TABLE IF NOT EXISTS `image` (`uid` CHAR(40) NOT NULL, `img` LONGBLOB, UNIQUE KEY `uid` (`uid`)) COLLATE utf8_general_ci;');
-            $this->conn->query('CREATE TABLE IF NOT EXISTS `user` (id INT AUTO_INCREMENT PRIMARY KEY, name CHAR(50), password CHAR(40), sex INT, type INT, avatar CHAR(40), school VARCHAR(200), region VARCHAR(200), UNIQUE KEY `name`(`name`)) DEFAULT CHARSET=UTF8;');
-            $this->conn->query('CREATE TABLE IF NOT EXISTS `session` (sid CHAR(40) NOT NULL, uid INT, expire DATETIME, type INT)');
-            $this->conn->query('CREATE TABLE IF NOT EXISTS `shop` (id INT PRIMARY KEY AUTO_INCREMENT, uid INT, name VARCHAR(200), address VARCHAR(200), introduction TEXT, photo CHAR(40), phonenum VARCHAR(50)) DEFAULT CHARSET=UTF8;');
+            $this->conn->query(<<sql
+                CREATE TABLE IF NOT EXISTS `user` (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    name CHAR(50),
+                    password CHAR(40),
+                    sex INT,
+                    type INT,
+                    avatar CHAR(40),
+                    school VARCHAR(200),
+                    region VARCHAR(200),
+                    UNIQUE KEY `name`(`name`)
+                ) DEFAULT CHARSET=UTF8;
+sql
+                );
+            $this->conn->query(<<<sql
+                CREATE TABLE IF NOT EXISTS `session` (
+                    sid CHAR(40) NOT NULL,
+                    uid INT,
+                    expire DATETIME,
+                    type INT,
+                    CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(id)
+                );
+sql
+                );
+            $this->conn->query(<<<sql
+                CREATE TABLE IF NOT EXISTS `shop`(
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    uid INT, name VARCHAR(200),
+                    address VARCHAR(200),
+                    introduction TEXT,
+                    photo CHAR(40),
+                    phonenum VARCHAR(50),
+                    CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(id)
+                ) DEFAULT CHARSET=UTF8;
+sql
+                );
         }
         
         function GetParam($key, &$data, $force = true, $default = false) {
