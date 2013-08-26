@@ -92,6 +92,17 @@ sql
                 ) DEFAULT CHARSET=UTF8;
 sql
                 );
+            $this->conn->query(<<<sql
+                CREATE TABLE IF NOT EXISTS `shopmark` (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    shopid INT,
+                    uid INT,
+                    mark INT,
+                    CONSTRAINT FOREIGN KEY(shopid) REFERENCES `shop`(id),
+                    CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(id)
+                );
+sql
+                );
         }
         
         function GetParam($key, &$data, $force = true, $default = false) {
@@ -448,6 +459,40 @@ sql
             return array('result'=>1);
         }
         
+        function MethodShopMark() {
+            $this->SessionCheck($_REQUEST);
+            $shopid = (int)$this->GetParam('id', $_REQUEST);
+            $uid = (int)$this->GetParam('uid', $_REQUEST);
+            $mark = (int)$this->GetParam('mark', $_REQUEST);
+            if ($mark < 0 || $mark > 10) throw new FrException(-1, 'Mark out of range');
+            
+            $stmt = $this->conn->prepare('DELETE FROM `shopmark` WHERE shopid=? AND uid=?');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('ii', $shopid, $uid);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError();
+            $stmt->close();
+            
+            $stmt = $this->conn->prepare('INSERT INTO `shopmark` (shopid,uid,mark) VALUES (?,?,?);');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('iii', $shopid, $uid, $mark);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError();
+            $stmt->close();
+            
+            $stmt = $this->conn->prepare('SELECT AVG(mark) FROM `shopmark` WHERE shopid=?');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('i', $shopid);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError();
+            $stmt->bind_result($average);
+            $r = $stmt->fetch();
+            if ($r != true) $this->InternalError();
+            $stmt->close();
+            
+            return array('result'=>1, 'newmark'=>$average);
+        }
+        
         function MainHandler() {
             $this->Connect();
             $method = $this->GetParam('method', $_POST);
@@ -468,6 +513,8 @@ sql
                     return $this->MethodShopModify();
                 //case 'shop.delete':
                 //    return $this->MethodShopDelete();
+                case 'shop.mark':
+                    return $this->MethodShopMark();
                 case 'food.create':
                     return $this->MethodFoodCreate();
                 case 'food.modify':
