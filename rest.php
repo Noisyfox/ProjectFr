@@ -89,7 +89,7 @@
         }
         
         function SessionCheck(&$data, $owner_required = false) {
-            $id = $this->GetParam('id', $data);
+            $id = $this->GetParam('uid', $data);
             $session = $this->GetParam('session', $data);
             $stmt = $this->conn->prepare('SELECT type FROM session WHERE uid=? AND sid=? AND expire>NOW()');
             if (!$stmt) $this->InternalError();
@@ -178,8 +178,8 @@
                 if (!$r) $this->InternalError();
                 $stmt->close();
                 }
-            else if (isset($_REQUEST['id']) && isset($_REQUEST['session'])) {
-                $uid = (int)$_REQUEST['id'];
+            else if (isset($_REQUEST['uid']) && isset($_REQUEST['session'])) {
+                $uid = (int)$_REQUEST['uid'];
                 $newses = $_REQUEST['session'];
                 $stmt = $this->conn->prepare('SELECT uid FROM session WHERE uid=? AND sid=? AND expire>NOW()');
                 if (!$stmt) $this->InternalError();
@@ -217,7 +217,7 @@
         function MethodUserModify() {
             // Get original profile
             $this->SessionCheck($_REQUEST);
-            $id = (int)$this->GetParam('id', $_REQUEST);
+            $id = (int)$this->GetParam('uid', $_REQUEST);
             $stmt = $this->conn->prepare('SELECT name,password,sex,avatar,school,region FROM `user` WHERE id=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $id);
@@ -230,7 +230,6 @@
             $stmt->close();
             
             // Update profile
-            $id = $this->GetParam('id', $_REQUEST);
             $new_password = $this->GetParam('password', $_REQUEST, false);
             if ($new_password) $password = $new_password;
             if (isset($_REQUEST['sex'])) $sex = (int)$this->GetParam('sex', $_REQUEST);
@@ -255,6 +254,11 @@
             return array('result'=>1, 'session'=>$session);
         }
         
+        function MethodShopCreate() {
+            if (!$this->SessionCheck($_REQUEST, true)) throw new FrException(-1, 'Guest cannot create shops');
+            
+        }
+        
         function MainHandler() {
             try {
                 $this->Connect();
@@ -270,6 +274,8 @@
                         return $this->MethodUserLogin();
                     case 'user.modify':
                         return $this->MethodUserModify();
+                    case 'shop.create':
+                        return $this->MethodShopCreate();
                     default:
                         throw new FrException(0x002, 'Parameter `method` is not valid');
                 }
