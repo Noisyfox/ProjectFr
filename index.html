@@ -27,7 +27,11 @@
         -->
         <div>
             <p>ImageGet</p>
-
+            <form action="rest.php" method="post" enctype="multipart/form-data">
+                Method: <input name="method" type="text" value="image" /><br />
+                ID: <input name="id" type="text" /><br />
+                <input type="submit" value="Submit" />
+            </form>
         </div>
         <div>
             <p>User Register</p>
@@ -86,6 +90,7 @@
                 <input type="submit" value="Submit" />
             </form>
         </div>
+        <!--
         <div>
             <p>Shop Create</p>
             <form action="rest.php" method="post" enctype="multipart/form-data">
@@ -101,6 +106,7 @@
                 <input type="submit" value="Submit" />
             </form>
         </div>
+        -->
         <div>
             <p>Shop Modify</p>
             <form action="rest.php" method="post" enctype="multipart/form-data">
@@ -117,6 +123,7 @@
                 <input type="submit" value="Submit" />
             </form>
         </div>
+        <!--
         <div>
             <p>Shop Delete</p>
             <form action="rest.php" method="post" enctype="multipart/form-data">
@@ -127,5 +134,6 @@
                 <input type="submit" value="Submit" />
             </form>
         </div>
+        -->
     </body>
 </html>

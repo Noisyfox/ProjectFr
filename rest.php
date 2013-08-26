@@ -46,7 +46,7 @@
             // $this->conn->query('CREATE TABLE IF NOT EXISTS `image` (`uid` CHAR(40) NOT NULL, `img` LONGBLOB, UNIQUE KEY `uid` (`uid`)) COLLATE utf8_general_ci;');
             $this->conn->query('CREATE TABLE IF NOT EXISTS `user` (id INT AUTO_INCREMENT PRIMARY KEY, name CHAR(50), password CHAR(40), sex INT, type INT, avatar CHAR(40), school VARCHAR(200), region VARCHAR(200), UNIQUE KEY `name`(`name`)) DEFAULT CHARSET=UTF8;');
             $this->conn->query('CREATE TABLE IF NOT EXISTS `session` (sid CHAR(40) NOT NULL, uid INT, expire DATETIME, type INT)');
-            $this->conn->query('CREATE TABLE IF NOT EXISTS `shop` (id INT PRIMARY KEY AUTO_INCREMENT, uid INT, name VARCHAR(200), address VARCHAR(200), introduction TEXT, photo CHAR(40), phonenum VARCHAR(50), school VARCHAR(100)) DEFAULT CHARSET=UTF8;');
+            $this->conn->query('CREATE TABLE IF NOT EXISTS `shop` (id INT PRIMARY KEY AUTO_INCREMENT, uid INT, name VARCHAR(200), address VARCHAR(200), introduction TEXT, photo CHAR(40), phonenum VARCHAR(50)) DEFAULT CHARSET=UTF8;');
         }
         
         function GetParam($key, &$data, $force = true, $default = false) {
@@ -161,7 +161,19 @@
                 }
                 else $this->InternalError();
             }
-            return array('result'=>1, 'id'=>$this->conn->insert_id, 'session'=>$this->MethodUserLogin(true));
+            $uid = $this->conn->insert_id;
+            
+            if ($type == 1) {
+                // Reserve a shop
+                $blank = '';
+                $stmt = $this->conn->prepare('INSERT INTO `shop` (uid,name,address,introduction,photo,phonenum) VALUES (?,?,?,?,?,?);');
+                if (!$stmt) $this->InternalError();
+                $stmt->bind_param('isssss', $uid, $blank, $blank, $blank, $blank, $blank);
+                $r = $stmt->execute();
+                if (!$r) $this->InternalError();
+                $stmt->close();
+            }
+            return array('result'=>1, 'id'=>$uid, 'session'=>$this->MethodUserLogin(true));
         }
         
         function MethodUserLogin($session_only = false) {
@@ -212,15 +224,17 @@
             if ($session_only) return $newses;
 
             // Return user info
-            $stmt = $this->conn->prepare('SELECT name,sex,type,avatar,school,region FROM `user` WHERE id=?');
+            $stmt = $this->conn->prepare('SELECT user.name,sex,type,avatar,school,region,shop.id FROM `user` LEFT JOIN shop ON shop.uid=user.id WHERE user.id=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $uid);
             $r = $stmt->execute();
             if (!$r) $this->InternalError();
-            $stmt->bind_result($name,$sex,$type,$avatar,$school,$region);
+            $stmt->bind_result($name,$sex,$type,$avatar,$school,$region,$shopid);
             if (!$stmt->fetch()) throw new FrException(5, 'No such user');
             $stmt->close();
-            return array('result'=>1, 'id'=>$uid, 'session'=>$newses, 'sex'=>$sex, 'type'=>$type, 'avatar'=>$avatar, 'school'=>$school, 'region'=>$region);
+            $result = array('result'=>1, 'id'=>$uid, 'session'=>$newses, 'sex'=>$sex, 'type'=>$type, 'avatar'=>$avatar, 'school'=>$school, 'region'=>$region);
+            if ($result['type'] == 1) $result['shopid'] = $shopid;
+            return $result;
         }
         
         function MethodUserModify() {
@@ -271,11 +285,10 @@
             $introduction = $this->GetParam('introduction', $_REQUEST);
             $photohash = $this->ImageSave($this->GetUploadfile('photo'));
             $phonenum = $this->GetParam('phonenum', $_REQUEST);
-            $school = $this->GetParam('school', $_REQUEST);
             
-            $stmt = $this->conn->prepare('INSERT INTO `shop` (uid,name,address,introduction,photo,phonenum,school) VALUES (?,?,?,?,?,?,?);');
+            $stmt = $this->conn->prepare('INSERT INTO `shop` (uid,name,address,introduction,photo,phonenum) VALUES (?,?,?,?,?,?);');
             if (!$stmt) $this->InternalError();
-            $stmt->bind_param('issssss', $uid, $name, $address, $introduction, $photohash, $phonenum, $school);
+            $stmt->bind_param('issssss', $uid, $name, $address, $introduction, $photohash, $phonenum);
             $r = $stmt->execute();
             if (!$r) $this->InternalError();
             $stmt->close();
@@ -286,12 +299,12 @@
         function MethodShopModify() {
             if (!$this->SessionCheck($_REQUEST, true)) throw new FrException(-1, 'Guest cannot create shops');
             $id = (int)$this->GetParam('id', $_REQUEST);
-            $stmt = $this->conn->prepare('SELECT uid,name,address,introduction,photo,phonenum,school FROM `shop` WHERE id=?');
+            $stmt = $this->conn->prepare('SELECT uid,name,address,introduction,photo,phonenum FROM `shop` WHERE id=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $id);
             $r = $stmt->execute();
             if (!$r) $this->InternalError();
-            $stmt->bind_result($uid, $name, $address, $introduction, $photohash, $phonenum, $school);
+            $stmt->bind_result($uid, $name, $address, $introduction, $photohash, $phonenum);
             $r = $stmt->fetch();
             $stmt->close();
             if ($r == false) $this->InternalError();
@@ -301,13 +314,12 @@
             $address = $this->GetParam('address', $_REQUEST, false, $address);
             $introduction = $this->GetParam('introduction', $_REQUEST, false, $introduction);
             $phonenum = $this->GetParam('phonenum', $_REQUEST, false, $phonenum);
-            $school = $this->GetParam('school', $_REQUEST, false, $school);
             $photo_tmp = $this->GetUploadfile('photo', false);
             if ($photo_tmp) $photohash = $this->ImageSave($photo_tmp);
             
-            $stmt = $this->conn->prepare('UPDATE shop SET name=?,address=?,introduction=?,photo=?,phonenum=?,school=? WHERE id=?');
+            $stmt = $this->conn->prepare('UPDATE shop SET name=?,address=?,introduction=?,photo=?,phonenum=? WHERE id=?');
             if (!$stmt) $this->InternalError();
-            $stmt->bind_param('ssssssi', $name, $address, $introduction, $photohash, $phonenum, $school, $id);
+            $stmt->bind_param('sssssi', $name, $address, $introduction, $photohash, $phonenum, $id);
             $r = $stmt->execute();
             if (!$r) $this->InternalError();
             $stmt->close();
@@ -328,37 +340,42 @@
         }
         
         function MainHandler() {
-            try {
-                $this->Connect();
-                $method = $this->GetParam('method', $_POST);
-                switch ($method) {
-                    case 'test':
-                        return $this->MethodTest();
-                    case 'image':
-                        return $this->ImageGet();
-                    case 'user.register':
-                        return $this->MethodUserRegister();
-                    case 'user.login':
-                        return $this->MethodUserLogin();
-                    case 'user.modify':
-                        return $this->MethodUserModify();
-                    case 'shop.create':
-                        return $this->MethodShopCreate();
-                    case 'shop.modify':
-                        return $this->MethodShopModify();
-                    case 'shop.delete':
-                        return $this->MethodShopDelete();
-                    default:
-                        throw new FrException(0x002, 'Parameter `method` is not valid');
-                }
-            }
-            catch (FrException $e) {
-                return $e->JsonMessage();
+            $this->Connect();
+            $method = $this->GetParam('method', $_POST);
+            switch ($method) {
+                case 'test':
+                    return $this->MethodTest();
+                case 'image':
+                    return $this->ImageGet();
+                case 'user.register':
+                    return $this->MethodUserRegister();
+                case 'user.login':
+                    return $this->MethodUserLogin();
+                case 'user.modify':
+                    return $this->MethodUserModify();
+                //case 'shop.create':
+                //    return $this->MethodShopCreate();
+                case 'shop.modify':
+                    return $this->MethodShopModify();
+                //case 'shop.delete':
+                //    return $this->MethodShopDelete();
+                default:
+                    throw new FrException(0x002, 'Parameter `method` is not valid');
             }
         }
         
         function HandleRequest() {
-            $result = $this->MainHandler();
+            $debug = true;
+            if ($debug) {
+                $result = $this->MainHandler();
+            } else {
+                try {
+                    $result = $this->MainHandler();
+                }
+                catch (FrException $e) {
+                    $result = $e->JsonMessage();
+                }
+            }
             if (!isset($result['response_type'])) {
                 // Json response
                 header('Content-Type: text/plain; charset=utf8');
