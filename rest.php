@@ -45,7 +45,7 @@
         function InitTable() {
             // $this->conn->query('CREATE TABLE IF NOT EXISTS `image` (`uid` CHAR(40) NOT NULL, `img` LONGBLOB, UNIQUE KEY `uid` (`uid`)) COLLATE utf8_general_ci;');
             $this->conn->query('CREATE TABLE IF NOT EXISTS `user` (id INT AUTO_INCREMENT PRIMARY KEY, name CHAR(50), password CHAR(40), sex INT, type INT, avatar CHAR(40), school VARCHAR(200), region VARCHAR(200), UNIQUE KEY `name`(`name`)) DEFAULT CHARSET=UTF8;');
-            $this->conn->query('CREATE TABLE IF NOT EXISTS `session` (sid CHAR(40) NOT NULL, uid INT, expire DATETIME)');
+            $this->conn->query('CREATE TABLE IF NOT EXISTS `session` (sid CHAR(40) NOT NULL, uid INT, expire DATETIME, type INT)');
         }
         
         function GetParam($key, &$data, $force = true, $default = false) {
@@ -88,18 +88,29 @@
             return array('response_type'=>'image','data'=>$contents);
         }
         
-        function CheckSession(&$data) {
+        function SessionCheck(&$data, $owner_required = false) {
             $id = $this->GetParam('id', $data);
             $session = $this->GetParam('session', $data);
-            $stmt = $this->conn->prepare('SELECT uid FROM session WHERE uid=? AND sid=? AND expire>NOW()');
+            $stmt = $this->conn->prepare('SELECT type FROM session WHERE uid=? AND sid=? AND expire>NOW()');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('is', $id, $session);
             $r = $stmt->execute();
             if (!$r) $this->InternalError();
+            $stmt->bind_result($type);
             $r = $stmt->fetch();
             $stmt->close();
             if ($r == false) $this->InternalError();
             if ($r == NULL) throw new FrException(-1, 'Session Invalid');
+            if ($owner_required && $type != 1) return false;
+            return true;
+        }
+        
+        function SessionReset($uid) {
+            $stmt = $this->conn->prepare('DELETE FROM session WHERE uid=?');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('i', $uid);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError();
         }
         
         function MethodTest() {
@@ -148,21 +159,21 @@
             // Authenticate
             $uid = 0;
             if (isset($_REQUEST['name']) && isset($_REQUEST['password'])) {
-                $stmt = $this->conn->prepare('SELECT id FROM `user` WHERE name=? AND password=?');
+                $stmt = $this->conn->prepare('SELECT id, type FROM `user` WHERE name=? AND password=?');
                 if (!$stmt) $this->InternalError();
                 $stmt->bind_param('ss', $_REQUEST['name'], $_REQUEST['password']);
                 $r = $stmt->execute();
                 if (!$r) $this->InternalError();
-                $stmt->bind_result($uid);
+                $stmt->bind_result($uid, $type);
                 if (!$stmt->fetch()) throw new FrException(-1, 'Login fail 1');
                 $stmt->close();
                 
-                // Update Session
+                // Update session
                 $random = 'SESSION'.$uid.time().mt_rand().mt_rand().mt_rand();
                 $newses = hash('sha1', $random);
-                $stmt = $this->conn->prepare('INSERT INTO session (uid,sid,expire) VALUES (?,?,DATE_ADD(NOW(), INTERVAL 30 DAY));');
+                $stmt = $this->conn->prepare('INSERT INTO session (uid,type,sid,expire) VALUES (?,?,?,DATE_ADD(NOW(), INTERVAL 30 DAY));');
                 if (!$stmt) $this->InternalError();
-                $stmt->bind_param('is', $uid, $newses);
+                $stmt->bind_param('iis', $uid, $type, $newses);
                 $r = $stmt->execute();
                 if (!$r) $this->InternalError();
                 $stmt->close();
@@ -179,6 +190,8 @@
                 $stmt->close();
                 if ($r == NULL) throw new FrException(-1, 'Login fail 2');
                 if ($r == false) $this->InternalError();
+                
+                // Refresh session
                 $stmt = $this->conn->prepare('UPDATE session SET expire=DATE_ADD(NOW(), INTERVAL 30 DAY) WHERE uid=? AND sid=?');
                 if (!$stmt) $this->InternalError();
                 $stmt->bind_param('is', $uid, $newses);
@@ -202,21 +215,24 @@
         }
         
         function MethodUserModify() {
-            $this->CheckSession($_REQUEST);
+            // Get original profile
+            $this->SessionCheck($_REQUEST);
             $id = (int)$this->GetParam('id', $_REQUEST);
-            $stmt = $this->conn->prepare('SELECT password,sex,avatar,school,region FROM `user` WHERE id=?');
+            $stmt = $this->conn->prepare('SELECT name,password,sex,avatar,school,region FROM `user` WHERE id=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $id);
             $r = $stmt->execute();
             if (!$r) $this->InternalError();
-            $stmt->bind_result($password, $sex, $avatar, $school, $region);
+            $stmt->bind_result($name,$password, $sex, $avatar, $school, $region);
             $r = $stmt->fetch();
             if ($r == NULL) throw new FrException(5, 'No such user');
             if ($r == false) $this->InternalError();
             $stmt->close();
             
+            // Update profile
             $id = $this->GetParam('id', $_REQUEST);
-            $password = $this->GetParam('password', $_REQUEST, false, $password);
+            $new_password = $this->GetParam('password', $_REQUEST, false);
+            if ($new_password) $password = $new_password;
             if (isset($_REQUEST['sex'])) $sex = (int)$this->GetParam('sex', $_REQUEST);
             $school = $this->GetParam('school', $_REQUEST, false, $school);
             $region = $this->GetParam('region', $_REQUEST, false, $region);
@@ -229,7 +245,14 @@
             $stmt->bind_param('sisssi', $password, $sex, $avatar, $school, $region, $id);
             $r = $stmt->execute();
             if (!$r) $this->InternalError();
-            return array('result'=>1);
+            
+            if ($new_password) {
+                $this->SessionReset($id);
+                $_REQUEST['name'] = $name;
+                $session = $this->MethodUserLogin(true);
+            }
+            else $session = $_REQUEST['session'];
+            return array('result'=>1, 'session'=>$session);
         }
         
         function MainHandler() {
@@ -259,7 +282,7 @@
         function HandleRequest() {
             $result = $this->MainHandler();
             if (!isset($result['response_type'])) {
-                // Json result
+                // Json response
                 header('Content-Type: text/plain; charset=utf8');
                 echo json_encode($result);
             }
@@ -268,7 +291,7 @@
                 echo $result['data'];
             }
             else {
-                // Image Output
+                // Image response
                 if ($result['data'] == false) {
                     header('HTTP/1.0 404 Not Found');
                     echo('Not found');
