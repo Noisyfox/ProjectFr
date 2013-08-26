@@ -15,11 +15,21 @@
         }
     </style>
     <body>
+        <!--
         <div>
             <p>Multipart test</p>
             <form action="rest.php" method="post" enctype="multipart/form-data">
                 Method: <input name="method" type="text" value="test" /><br />
                 File: <input name="img" type="file" /><br />
+                <input type="submit" value="Submit" />
+            </form>
+        </div>
+        -->
+        <div>
+            <p>ImageGet</p>
+            <form action="rest.php" method="post" enctype="multipart/form-data">
+                Method: <input name="method" type="text" value="image" /><br />
+                ID: <input name="id" type="text" /><br />
                 <input type="submit" value="Submit" />
             </form>
         </div>
@@ -61,5 +71,24 @@
                 Session: <input name="session" type="text" /><br />
                 <input type="submit" value="Submit" />
             </form>
-        </div>    </body>
+        </div>
+        <div>
+            <p>User Modify</p>
+            <form action="rest.php" method="post" enctype="multipart/form-data">
+                Method: <input name="method" type="text" value="user.modify" /> <br />
+                ID: <input name="id" type="text" value="1" /><br />
+                session: <input name="session" type="text" /><br />
+                Password: <input name="password" type="text" value="aaa" /><br />
+                Sex:
+                    <input name="sex" type="radio" value="0">Unknown
+                    <input name="sex" type="radio" value="1" checked>Male
+                    <input name="sex" type="radio" value="2">Female
+                <br />
+                Avatar: <input name="avatar" type="file" /><br />
+                School: <input name="school" type="text" value="UA" /><br />
+                Region: <input name="region" type="text" value="JS" /><br />
+                <input type="submit" value="Submit" />
+            </form>
+        </div>
+    </body>
 </html>

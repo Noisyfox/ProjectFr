@@ -48,7 +48,7 @@
             $this->conn->query('CREATE TABLE IF NOT EXISTS `session` (sid CHAR(40) NOT NULL, uid INT, expire DATETIME)');
         }
         
-        function GetParam($key, &$data, $force = true, $default = null) {
+        function GetParam($key, &$data, $force = true, $default = false) {
             if (!isset($data[$key])) {
                 if ($force) {
                     throw new FrException(0x001, 'Required parameter `'.$key.'` is not present');
@@ -72,11 +72,34 @@
             if ($hash == false) {
                 throw new FrException(3, 'Cannot open temp file');
             }
-            $r = copy($tmpfile, IMAGE_PATH.'/'.$hash);
+            // $r = copy($tmpfile, IMAGE_PATH.'/'.$hash);
+            $r = @move_uploaded_file($tmpfile, IMAGE_PATH.'/'.$hash);
             if (!$r) {
                 throw new FrException(3, 'Cannot copy file');
             }
             return $hash;
+        }
+        
+        function ImageGet() {
+            $id = $this->GetParam('id', $_REQUEST);
+            $pattern = '/[0-9a-fA-F]+/';
+            if (!preg_match($pattern, $id)) throw new FrException(6, 'Illegal id');
+            $contents = @file_get_contents(IMAGE_PATH.'/'.$id);
+            return array('response_type'=>'image','data'=>$contents);
+        }
+        
+        function CheckSession(&$data) {
+            $id = $this->GetParam('id', $data);
+            $session = $this->GetParam('session', $data);
+            $stmt = $this->conn->prepare('SELECT uid FROM session WHERE uid=? AND sid=? AND expire>NOW()');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('is', $id, $session);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError();
+            $r = $stmt->fetch();
+            $stmt->close();
+            if ($r == false) $this->InternalError();
+            if ($r == NULL) throw new FrException(-1, 'Session Invalid');
         }
         
         function MethodTest() {
@@ -134,30 +157,38 @@
                 if (!$stmt->fetch()) throw new FrException(-1, 'Login fail 1');
                 $stmt->close();
                 
-            }
+                // Update Session
+                $random = 'SESSION'.$uid.time().mt_rand().mt_rand().mt_rand();
+                $newses = hash('sha1', $random);
+                $stmt = $this->conn->prepare('INSERT INTO session (uid,sid,expire) VALUES (?,?,DATE_ADD(NOW(), INTERVAL 30 DAY));');
+                if (!$stmt) $this->InternalError();
+                $stmt->bind_param('is', $uid, $newses);
+                $r = $stmt->execute();
+                if (!$r) $this->InternalError();
+                $stmt->close();
+                }
             else if (isset($_REQUEST['id']) && isset($_REQUEST['session'])) {
                 $uid = (int)$_REQUEST['id'];
+                $newses = $_REQUEST['session'];
                 $stmt = $this->conn->prepare('SELECT uid FROM session WHERE uid=? AND sid=? AND expire>NOW()');
                 if (!$stmt) $this->InternalError();
                 $stmt->bind_param('is', $uid, $_REQUEST['session']);
                 $r = $stmt->execute();
                 if (!$r) $this->InternalError();
-                if (!$stmt->fetch()) throw new FrException(-1, 'Login fail 2');
+                $r = $stmt->fetch();
                 $stmt->close();
+                if ($r == NULL) throw new FrException(-1, 'Login fail 2');
+                if ($r == false) $this->InternalError();
+                $stmt = $this->conn->prepare('UPDATE session SET expire=DATE_ADD(NOW(), INTERVAL 30 DAY) WHERE uid=? AND sid=?');
+                if (!$stmt) $this->InternalError();
+                $stmt->bind_param('is', $uid, $newses);
+                $r = $stmt->execute();
+                if (!$r) $this->InternalError();
             }
             else throw new FrException(1, 'Wrong calling parameters');
             
-            // Update Session
-            $random = 'SESSION'.$uid.time().mt_rand().mt_rand().mt_rand();
-            $newses = hash('sha1', $random);
-            $stmt = $this->conn->prepare('INSERT INTO session (uid,sid,expire) VALUES (?,?,DATE_ADD(NOW(), INTERVAL 30 DAY));');
-            if (!$stmt) $this->InternalError();
-            $stmt->bind_param('is', $uid, $newses);
-            $r = $stmt->execute();
-            if (!$r) $this->InternalError();
-            $stmt->close();
             if ($session_only) return $newses;
-            
+
             // Return user info
             $stmt = $this->conn->prepare('SELECT name,sex,type,avatar,school,region FROM `user` WHERE id=?');
             if (!$stmt) $this->InternalError();
@@ -170,6 +201,37 @@
             return array('result'=>1, 'id'=>$uid, 'session'=>$newses, 'sex'=>$sex, 'type'=>$type, 'avatar'=>$avatar, 'school'=>$school, 'region'=>$region);
         }
         
+        function MethodUserModify() {
+            $this->CheckSession($_REQUEST);
+            $id = (int)$this->GetParam('id', $_REQUEST);
+            $stmt = $this->conn->prepare('SELECT password,sex,avatar,school,region FROM `user` WHERE id=?');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('i', $id);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError();
+            $stmt->bind_result($password, $sex, $avatar, $school, $region);
+            $r = $stmt->fetch();
+            if ($r == NULL) throw new FrException(5, 'No such user');
+            if ($r == false) $this->InternalError();
+            $stmt->close();
+            
+            $id = $this->GetParam('id', $_REQUEST);
+            $password = $this->GetParam('password', $_REQUEST, false, $password);
+            if (isset($_REQUEST['sex'])) $sex = (int)$this->GetParam('sex', $_REQUEST);
+            $school = $this->GetParam('school', $_REQUEST, false, $school);
+            $region = $this->GetParam('region', $_REQUEST, false, $region);
+            if (isset($_FILES['avatar']) && $_FILES['avatar']['name']) {
+                $avatar = $this->ImageSave($_FILES['avatar']['tmp_name']);
+            }
+            
+            $stmt = $this->conn->prepare('UPDATE `user` SET password=?, sex=?, avatar=?, school=?, region=? WHERE id=?');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('sisssi', $password, $sex, $avatar, $school, $region, $id);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError();
+            return array('result'=>1);
+        }
+        
         function MainHandler() {
             try {
                 $this->Connect();
@@ -177,10 +239,14 @@
                 switch ($method) {
                     case 'test':
                         return $this->MethodTest();
+                    case 'image':
+                        return $this->ImageGet();
                     case 'user.register':
                         return $this->MethodUserRegister();
                     case 'user.login':
                         return $this->MethodUserLogin();
+                    case 'user.modify':
+                        return $this->MethodUserModify();
                     default:
                         throw new FrException(0x002, 'Parameter `method` is not valid');
                 }
@@ -203,8 +269,14 @@
             }
             else {
                 // Image Output
-                header('Content-Type: image/jpeg');
-                echo $result['data'];
+                if ($result['data'] == false) {
+                    header('HTTP/1.0 404 Not Found');
+                    echo('Not found');
+                }
+                else {
+                    header('Content-Type: image/jpeg');
+                    echo $result['data'];
+                }
             }
         }
     }
