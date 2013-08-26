@@ -134,5 +134,37 @@
             </form>
         </div>
         -->
+        <div>
+            <p>Food Create</p>
+            <form action="rest.php" method="post" enctype="multipart/form-data">
+                Method: <input name="method" type="text" value="food.create" /><br />
+                UID: <input name="uid" type="text" value="1" /><br />
+                Session: <input name="session" type="text" /><br />
+                Shop id: <input name="id" type="text" value="1" /><br />
+                Name: <input name="name" type="text" value="egg" /><br />
+                Price: <input name="price" type="text" value="12.5" /><br />
+                Photo: <input name="photo" type="file" /><br />
+                Special: 
+                    <input name="special" type="radio" value="0">Not
+                    <input name="special" type="radio" value="1" checked>Special
+                <input type="submit" value="Submit" />
+            </form>            
+        </div>
+        <div>
+            <p>Food Modify</p>
+            <form action="rest.php" method="post" enctype="multipart/form-data">
+                Method: <input name="method" type="text" value="food.modify" /><br />
+                UID: <input name="uid" type="text" value="1" /><br />
+                Session: <input name="session" type="text" /><br />
+                Food id: <input name="id" type="text" value="1" /><br />
+                Name: <input name="name" type="text" value="egg" /><br />
+                Price: <input name="price" type="text" value="12.5" /><br />
+                Photo: <input name="photo" type="file" /><br />
+                Special: 
+                    <input name="special" type="radio" value="0">Not
+                    <input name="special" type="radio" value="1" checked>Special
+                <input type="submit" value="Submit" />
+            </form>
+        </div>
     </body>
 </html>

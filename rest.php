@@ -44,7 +44,7 @@
         
         function InitTable() {
             // $this->conn->query('CREATE TABLE IF NOT EXISTS `image` (`uid` CHAR(40) NOT NULL, `img` LONGBLOB, UNIQUE KEY `uid` (`uid`)) COLLATE utf8_general_ci;');
-            $this->conn->query(<<sql
+            $this->conn->query(<<<sql
                 CREATE TABLE IF NOT EXISTS `user` (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     name CHAR(50),
@@ -77,6 +77,18 @@ sql
                     photo CHAR(40),
                     phonenum VARCHAR(50),
                     CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(id)
+                ) DEFAULT CHARSET=UTF8;
+sql
+                );
+            $this->conn->query(<<<sql
+                CREATE TABLE IF NOT EXISTS `food` (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    shopid INT,
+                    name VARCHAR(50),
+                    price DECIMAL(5,2),
+                    photo CHAR(40),
+                    special BOOL,
+                    CONSTRAINT FOREIGN KEY(shopid) REFERENCES `shop`(id)
                 ) DEFAULT CHARSET=UTF8;
 sql
                 );
@@ -143,8 +155,7 @@ sql
             $stmt->close();
             if ($r == false) $this->InternalError();
             if ($r == NULL) throw new FrException(-1, 'Session Invalid');
-            if ($owner_required && $type != 1) return false;
-            return true;
+            if ($owner_required && $type != 1) throw new FrException(-1, 'Guest cannot operate shops');
         }
         
         function SessionReset($uid) {
@@ -153,6 +164,18 @@ sql
             $stmt->bind_param('i', $uid);
             $r = $stmt->execute();
             if (!$r) $this->InternalError();
+        }
+        
+        function ShopOwnerCheck($shopid, $uid) {
+            $stmt = $this->conn->prepare('SELECT id FROM `shop` WHERE id=? AND uid=?');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('ii', $uid, $shopid);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError();
+            $r = $stmt->fetch();
+            $stmt->close();
+            if ($r == false) $this->InternalError();
+            if ($r == NULL) throw new FrException(-1, 'Not shopowner');
         }
         
         function MethodTest() {
@@ -311,7 +334,7 @@ sql
         }
         
         function MethodShopCreate() {
-            if (!$this->SessionCheck($_REQUEST, true)) throw new FrException(-1, 'Guest cannot create shops');
+            $this->SessionCheck($_REQUEST, true);
             $uid = (int)$this->GetParam('uid', $_REQUEST);
             $name = $this->GetParam('name', $_REQUEST);
             $address = $this->GetParam('address', $_REQUEST);
@@ -330,7 +353,7 @@ sql
         }
         
         function MethodShopModify() {
-            if (!$this->SessionCheck($_REQUEST, true)) throw new FrException(-1, 'Guest cannot create shops');
+            $this->SessionCheck($_REQUEST, true);
             $id = (int)$this->GetParam('id', $_REQUEST);
             $stmt = $this->conn->prepare('SELECT uid,name,address,introduction,photo,phonenum FROM `shop` WHERE id=?');
             if (!$stmt) $this->InternalError();
@@ -360,7 +383,7 @@ sql
         }
         
         function MethodShopDelete() {
-            if (!$this->SessionCheck($_REQUEST, true)) throw new FrException(-1, 'Guest cannot create shops');
+            $this->SessionCheck($_REQUEST, true);
             $id = (int)$this->GetParam('id', $_REQUEST);
             $uid = (int)$this->GetParam('uid', $_REQUEST);
             $stmt = $this->conn->prepare('DELETE FROM `shop` WHERE id=? AND uid=?');
@@ -369,6 +392,59 @@ sql
             $r = $stmt->execute();
             if (!$r) $this->InternalError();
             $stmt->close();
+            return array('result'=>1);
+        }
+        
+        function MethodFoodCreate() {
+            $this->SessionCheck($_REQUEST, true);
+            $uid = (int)$this->GetParam('uid', $_REQUEST);
+            $shopid = (int)$this->GetParam('id', $_REQUEST);
+            $this->ShopOwnerCheck($shopid, $uid);
+            $name = $this->GetParam('name', $_REQUEST);
+            $price = (float)$this->GetParam('price', $_REQUEST);
+            $photohash = $this->ImageSave($this->GetUploadfile('photo'));
+            $special = (int)$this->GetParam('special', $_REQUEST);
+            
+            $stmt = $this->conn->prepare('INSERT INTO `food` (shopid,name,price,photo,special) VALUES (?,?,?,?,?);');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('isdsi', $shopid, $name, $price, $photohash, $special);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError();
+            $stmt->close();
+            
+            $fid = $this->conn->insert_id;
+            return array('result'=>1, 'id'=>$fid);
+        }
+        
+        function MethodFoodModify() {
+            $this->SessionCheck($_REQUEST, true);
+            $uid = (int)$this->GetParam('uid', $_REQUEST);
+            $fid = (int)$this->GetParam('id', $_REQUEST);
+            $stmt = $this->conn->prepare('SELECT shopid,name,price,photo,special FROM `food` WHERE id=?');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('i', $fid);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError();
+            $stmt->bind_result($shopid, $name, $price, $photohash, $special);
+            $r = $stmt->fetch();
+            if ($r == false) $this->InternalError();
+            if ($r == NULL) throw new FrException(5, 'No such food');
+            $stmt->close();
+            
+            $this->ShopOwnerCheck($shopid, $uid);
+            $name = $this->GetParam('name', $_REQUEST, false, $name);
+            $price_t = $this->GetParam('price', $_REQUEST, false);
+            if ($price_t) $price = (float)$price_t;
+            $special_t = $this->GetParam('special', $_REQUEST, false);
+            if ($special_t != false) $special = (int)$special_t;
+            $photo_t = $this->GetUploadfile('photo', false);
+            if ($photo_t) $photohash = $this->ImageSave($photo_t);
+            
+            $stmt = $this->conn->prepare('UPDATE `food` SET shopid=?,name=?,price=?,photo=?,special=? WHERE id=?');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('isdsii', $shopid, $name, $price, $photohash, $special, $fid);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError();
             return array('result'=>1);
         }
         
@@ -392,13 +468,17 @@ sql
                     return $this->MethodShopModify();
                 //case 'shop.delete':
                 //    return $this->MethodShopDelete();
+                case 'food.create':
+                    return $this->MethodFoodCreate();
+                case 'food.modify':
+                    return $this->MethodFoodModify();
                 default:
                     throw new FrException(0x002, 'Parameter `method` is not valid');
             }
         }
         
         function HandleRequest() {
-            $debug = true;
+            $debug = 1;
             if ($debug) {
                 $result = $this->MainHandler();
             } else {
