@@ -23,5 +23,26 @@
                 <input type="submit" value="Submit" />
             </form>
         </div>
+        <div>
+            <p>User Register</p>
+            <form action="rest.php" method="post" enctype="multipart/form-data">
+                Method: <input name="method" type="text" value="user.register" /> <br />
+                Name: <input name="name" type="text" value="aaa" /><br />
+                Password: <input name="password" type="text" value="aaa" /><br />
+                Sex:
+                    <input name="sex" type="radio" value="0">Unknown
+                    <input name="sex" type="radio" value="1" checked>Male
+                    <input name="sex" type="radio" value="2">Female
+                <br />
+                Type:
+                    <input name="type" type="radio" value="0" checked>Consumer
+                    <input name="type" type="radio" value="1">Owner
+                <br />
+                Avatar: <input name="avatar" type="file" /><br />
+                School: <input name="school" type="text" value="UA" /><br />
+                Region: <input name="region" type="text" value="JS" /><br />
+                <input type="submit" value="Submit" />
+            </form>
+        </div>
     </body>
 </html>
