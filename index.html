@@ -27,11 +27,7 @@
         -->
         <div>
             <p>ImageGet</p>
-            <form action="rest.php" method="post" enctype="multipart/form-data">
-                Method: <input name="method" type="text" value="image" /><br />
-                ID: <input name="id" type="text" /><br />
-                <input type="submit" value="Submit" />
-            </form>
+
         </div>
         <div>
             <p>User Register</p>
@@ -87,6 +83,47 @@
                 Avatar: <input name="avatar" type="file" /><br />
                 School: <input name="school" type="text" value="UA" /><br />
                 Region: <input name="region" type="text" value="JS" /><br />
+                <input type="submit" value="Submit" />
+            </form>
+        </div>
+        <div>
+            <p>Shop Create</p>
+            <form action="rest.php" method="post" enctype="multipart/form-data">
+                Method: <input name="method" type="text" value="shop.create" /><br />
+                UID: <input name="uid" type="text" value="1" /><br />
+                Session: <input name="session" type="text" /><br />
+                Name: <input name="name" type="text" value="abc Restaurant" /><br />
+                Address: <input name="address" type="text" value="RM road" /><br />
+                Introduction: <input name="introduction" type="text" value="bilibili" /><br />
+                Photo: <input name="photo" type="file" /><br />
+                Phonenum: <input name="phonenum" type="text" value="025-10000" /><br />
+                School: <input name="school" type="text" value="ABC School" /><br />
+                <input type="submit" value="Submit" />
+            </form>
+        </div>
+        <div>
+            <p>Shop Modify</p>
+            <form action="rest.php" method="post" enctype="multipart/form-data">
+                Method: <input name="method" type="text" value="shop.modify" /><br />
+                UID: <input name="uid" type="text" value="1" /><br />
+                Session: <input name="session" type="text" /><br />
+                Shop id: <input name="id" type="text" value="1" /><br />
+                Name: <input name="name" type="text" value="abc Restaurant" /><br />
+                Address: <input name="address" type="text" value="RM road" /><br />
+                Introduction: <input name="introduction" type="text" value="bilibili" /><br />
+                Photo: <input name="photo" type="file" /><br />
+                Phonenum: <input name="phonenum" type="text" value="025-10000" /><br />
+                School: <input name="school" type="text" value="ABC School" /><br />
+                <input type="submit" value="Submit" />
+            </form>
+        </div>
+        <div>
+            <p>Shop Delete</p>
+            <form action="rest.php" method="post" enctype="multipart/form-data">
+                Method: <input name="method" type="text" value="shop.delete" /><br />
+                UID: <input name="uid" type="text" value="1" /><br />
+                Session: <input name="session" type="text" /><br />
+                Shop id: <input name="id" type="text" value="1" /><br />
                 <input type="submit" value="Submit" />
             </form>
         </div>

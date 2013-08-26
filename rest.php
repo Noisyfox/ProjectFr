@@ -46,6 +46,7 @@
             // $this->conn->query('CREATE TABLE IF NOT EXISTS `image` (`uid` CHAR(40) NOT NULL, `img` LONGBLOB, UNIQUE KEY `uid` (`uid`)) COLLATE utf8_general_ci;');
             $this->conn->query('CREATE TABLE IF NOT EXISTS `user` (id INT AUTO_INCREMENT PRIMARY KEY, name CHAR(50), password CHAR(40), sex INT, type INT, avatar CHAR(40), school VARCHAR(200), region VARCHAR(200), UNIQUE KEY `name`(`name`)) DEFAULT CHARSET=UTF8;');
             $this->conn->query('CREATE TABLE IF NOT EXISTS `session` (sid CHAR(40) NOT NULL, uid INT, expire DATETIME, type INT)');
+            $this->conn->query('CREATE TABLE IF NOT EXISTS `shop` (id INT PRIMARY KEY AUTO_INCREMENT, uid INT, name VARCHAR(200), address VARCHAR(200), introduction TEXT, photo CHAR(40), phonenum VARCHAR(50), school VARCHAR(100)) DEFAULT CHARSET=UTF8;');
         }
         
         function GetParam($key, &$data, $force = true, $default = false) {
@@ -58,6 +59,14 @@
             return $data[$key];
         }
         
+        function GetUploadfile($key, $force = true, $default = false) {
+            if (!isset($_FILES[$key]) || !$_FILES[$key]['tmp_name']) {
+                if ($force) throw new FrException(1, 'Parameter `'.$key.'` missing');
+                return $default;
+            }
+            return $_FILES[$key]['tmp_name'];
+        }
+        
         function ImageSave($tmpfile) {
             if (!file_exists(IMAGE_PATH)) {
                 if (!mkdir(IMAGE_PATH)) {
@@ -68,7 +77,7 @@
                 throw new FrException(3, 'Cannot open image directory');
             }
             
-            $hash = hash_file('sha1', $tmpfile);
+            $hash = @hash_file('sha1', $tmpfile);
             if ($hash == false) {
                 throw new FrException(3, 'Cannot open temp file');
             }
@@ -89,7 +98,7 @@
         }
         
         function SessionCheck(&$data, $owner_required = false) {
-            $id = $this->GetParam('uid', $data);
+            $id = (int)$this->GetParam('uid', $data);
             $session = $this->GetParam('session', $data);
             $stmt = $this->conn->prepare('SELECT type FROM session WHERE uid=? AND sid=? AND expire>NOW()');
             if (!$stmt) $this->InternalError();
@@ -256,7 +265,66 @@
         
         function MethodShopCreate() {
             if (!$this->SessionCheck($_REQUEST, true)) throw new FrException(-1, 'Guest cannot create shops');
+            $uid = (int)$this->GetParam('uid', $_REQUEST);
+            $name = $this->GetParam('name', $_REQUEST);
+            $address = $this->GetParam('address', $_REQUEST);
+            $introduction = $this->GetParam('introduction', $_REQUEST);
+            $photohash = $this->ImageSave($this->GetUploadfile('photo'));
+            $phonenum = $this->GetParam('phonenum', $_REQUEST);
+            $school = $this->GetParam('school', $_REQUEST);
             
+            $stmt = $this->conn->prepare('INSERT INTO `shop` (uid,name,address,introduction,photo,phonenum,school) VALUES (?,?,?,?,?,?,?);');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('issssss', $uid, $name, $address, $introduction, $photohash, $phonenum, $school);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError();
+            $stmt->close();
+            
+            return array('result'=>1, 'id'=>$this->conn->insert_id);
+        }
+        
+        function MethodShopModify() {
+            if (!$this->SessionCheck($_REQUEST, true)) throw new FrException(-1, 'Guest cannot create shops');
+            $id = (int)$this->GetParam('id', $_REQUEST);
+            $stmt = $this->conn->prepare('SELECT uid,name,address,introduction,photo,phonenum,school FROM `shop` WHERE id=?');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('i', $id);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError();
+            $stmt->bind_result($uid, $name, $address, $introduction, $photohash, $phonenum, $school);
+            $r = $stmt->fetch();
+            $stmt->close();
+            if ($r == false) $this->InternalError();
+            if ($r == NULL) throw new FrException(5, 'No such shop');
+            
+            $name = $this->GetParam('name', $_REQUEST, false, $name);
+            $address = $this->GetParam('address', $_REQUEST, false, $address);
+            $introduction = $this->GetParam('introduction', $_REQUEST, false, $introduction);
+            $phonenum = $this->GetParam('phonenum', $_REQUEST, false, $phonenum);
+            $school = $this->GetParam('school', $_REQUEST, false, $school);
+            $photo_tmp = $this->GetUploadfile('photo', false);
+            if ($photo_tmp) $photohash = $this->ImageSave($photo_tmp);
+            
+            $stmt = $this->conn->prepare('UPDATE shop SET name=?,address=?,introduction=?,photo=?,phonenum=?,school=? WHERE id=?');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('ssssssi', $name, $address, $introduction, $photohash, $phonenum, $school, $id);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError();
+            $stmt->close();
+            return array('result'=>1);
+        }
+        
+        function MethodShopDelete() {
+            if (!$this->SessionCheck($_REQUEST, true)) throw new FrException(-1, 'Guest cannot create shops');
+            $id = (int)$this->GetParam('id', $_REQUEST);
+            $uid = (int)$this->GetParam('uid', $_REQUEST);
+            $stmt = $this->conn->prepare('DELETE FROM `shop` WHERE id=? AND uid=?');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('ii', $id, $uid);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError();
+            $stmt->close();
+            return array('result'=>1);
         }
         
         function MainHandler() {
@@ -276,6 +344,10 @@
                         return $this->MethodUserModify();
                     case 'shop.create':
                         return $this->MethodShopCreate();
+                    case 'shop.modify':
+                        return $this->MethodShopModify();
+                    case 'shop.delete':
+                        return $this->MethodShopDelete();
                     default:
                         throw new FrException(0x002, 'Parameter `method` is not valid');
                 }
