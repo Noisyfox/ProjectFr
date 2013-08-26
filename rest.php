@@ -28,6 +28,7 @@
         }
         
         function InternalError() {
+            if ($this->conn && $this->conn->error) throw new FrException(500, $this->conn->error);
             throw new FrException(500, 'Internal Error');
         }
         
@@ -42,8 +43,9 @@
         }
         
         function InitTable() {
-            $this->conn->query('CREATE TABLE IF NOT EXISTS `image` (`uid` CHAR(40) NOT NULL, `img` LONGBLOB, UNIQUE KEY `uid` (`uid`)) COLLATE utf8_general_ci;');
-            $this->conn->query('CREATE TABLE IF NOT EXISTS `user` (id INT AUTO_INCREMENT PRIMARY KEY, name CHAR(50), password CHAR(40), sex INT, avatar CHAR(40), school VARCHAR(200), region VARCHAR(200), UNIQUE KEY `name`(`name`)) DEFAULT CHARSET=UTF8;');
+            // $this->conn->query('CREATE TABLE IF NOT EXISTS `image` (`uid` CHAR(40) NOT NULL, `img` LONGBLOB, UNIQUE KEY `uid` (`uid`)) COLLATE utf8_general_ci;');
+            $this->conn->query('CREATE TABLE IF NOT EXISTS `user` (id INT AUTO_INCREMENT PRIMARY KEY, name CHAR(50), password CHAR(40), sex INT, type INT, avatar CHAR(40), school VARCHAR(200), region VARCHAR(200), UNIQUE KEY `name`(`name`)) DEFAULT CHARSET=UTF8;');
+            $this->conn->query('CREATE TABLE IF NOT EXISTS `session` (sid CHAR(40) NOT NULL, uid INT, expire DATETIME)');
         }
         
         function GetParam($key, &$data, $force = true, $default = null) {
@@ -105,31 +107,67 @@
             $region = $this->GetParam('region', $_REQUEST);
             $avatar_hash = $this->ImageSave($avatar_tmp);
             
-            // Check duplicated user name
-            // $stmt = $this->conn->prepare('SELECT id FROM `user` WHERE name=?');
-            // $stmt->bind_param('s', $name);
-            // $stmt->execute();
-            // $duplicated = $stmt->fetch();
-            // $stmt->close();
-            // if ($duplicated == true) {
-            //     throw new FrException(-1, 'Duplicated user name');
-            // }
-            // if ($duplicated == false) {
-            //     $this->InternalError();
-            // }
-            
-            $stmt = $this->conn->prepare('INSERT INTO `user` (name,password,sex,avatar,school,region) VALUES (?,?,?,?,?,?);');
-            if (!$stmt) throw new FrException(5, $this->conn->error);
-            $stmt->bind_param('ssisss', $name, $password, $sex, $avatar_hash, $school, $region);
+            $stmt = $this->conn->prepare('INSERT INTO `user` (name,password,sex,type,avatar,school,region) VALUES (?,?,?,?,?,?,?);');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('ssiisss', $name, $password, $sex, $type, $avatar_hash, $school, $region);
             $r = $stmt->execute();
             if (!$r) {
                 if ($this->conn->errno == 1062) {
                     // Duplicated key(user name)
                     throw new FrException(-1, 'Duplicated user name');
                 }
-                else throw new FrException(5, 'DbError '.$this->conn->error);
+                else $this->InternalError();
             }
-            return array('result'=>1);
+            return array('result'=>1, 'id'=>$this->conn->insert_id, 'session'=>$this->MethodUserLogin(true));
+        }
+        
+        function MethodUserLogin($session_only = false) {
+            // Authenticate
+            $uid = 0;
+            if (isset($_REQUEST['name']) && isset($_REQUEST['password'])) {
+                $stmt = $this->conn->prepare('SELECT id FROM `user` WHERE name=? AND password=?');
+                if (!$stmt) $this->InternalError();
+                $stmt->bind_param('ss', $_REQUEST['name'], $_REQUEST['password']);
+                $r = $stmt->execute();
+                if (!$r) $this->InternalError();
+                $stmt->bind_result($uid);
+                if (!$stmt->fetch()) throw new FrException(-1, 'Login fail 1');
+                $stmt->close();
+                
+            }
+            else if (isset($_REQUEST['id']) && isset($_REQUEST['session'])) {
+                $uid = (int)$_REQUEST['id'];
+                $stmt = $this->conn->prepare('SELECT uid FROM session WHERE uid=? AND sid=? AND expire>NOW()');
+                if (!$stmt) $this->InternalError();
+                $stmt->bind_param('is', $uid, $_REQUEST['session']);
+                $r = $stmt->execute();
+                if (!$r) $this->InternalError();
+                if (!$stmt->fetch()) throw new FrException(-1, 'Login fail 2');
+                $stmt->close();
+            }
+            else throw new FrException(1, 'Wrong calling parameters');
+            
+            // Update Session
+            $random = 'SESSION'.$uid.time().mt_rand().mt_rand().mt_rand();
+            $newses = hash('sha1', $random);
+            $stmt = $this->conn->prepare('INSERT INTO session (uid,sid,expire) VALUES (?,?,DATE_ADD(NOW(), INTERVAL 30 DAY));');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('is', $uid, $newses);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError();
+            $stmt->close();
+            if ($session_only) return $newses;
+            
+            // Return user info
+            $stmt = $this->conn->prepare('SELECT name,sex,type,avatar,school,region FROM `user` WHERE id=?');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('i', $uid);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError();
+            $stmt->bind_result($name,$sex,$type,$avatar,$school,$region);
+            if (!$stmt->fetch()) throw new FrException(5, 'No such user');
+            $stmt->close();
+            return array('result'=>1, 'id'=>$uid, 'session'=>$newses, 'sex'=>$sex, 'type'=>$type, 'avatar'=>$avatar, 'school'=>$school, 'region'=>$region);
         }
         
         function MainHandler() {
@@ -141,6 +179,8 @@
                         return $this->MethodTest();
                     case 'user.register':
                         return $this->MethodUserRegister();
+                    case 'user.login':
+                        return $this->MethodUserLogin();
                     default:
                         throw new FrException(0x002, 'Parameter `method` is not valid');
                 }
@@ -152,12 +192,12 @@
         
         function HandleRequest() {
             $result = $this->MainHandler();
-            if (!isset($result['type'])) {
+            if (!isset($result['response_type'])) {
                 // Json result
                 header('Content-Type: text/plain; charset=utf8');
                 echo json_encode($result);
             }
-            else if ($result['type'] == 'html') {
+            else if ($result['response_type'] == 'html') {
                 header('Content-Type: text/html; charset=utf8');
                 echo $result['data'];
             }
