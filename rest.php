@@ -27,7 +27,8 @@
             $this->Connect();
         }
         
-        function InternalError() {
+        function InternalError($stmt = null) {
+            if ($stmt && $stmt->error) throw new FrException(500, $stmt->error);
             if ($this->conn && $this->conn->error) throw new FrException(500, $this->conn->error);
             throw new FrException(500, 'Internal Error');
         }
@@ -204,6 +205,15 @@ sql
         }
         
         function MethodTest() {
+            $stmt = $this->conn->prepare('SELECT id FROM foodcmt');
+            $stmt->execute();
+            $stmt->bind_result($id);
+            $resp = array();
+            while ($stmt->fetch()) {
+                $resp[] = $id;
+            }
+            return array('result'=>$resp);
+        
             $name = $_FILES['img']['tmp_name'];
             $handle = fopen($name, 'rb');
             $contents = fread($handle, filesize($name));
@@ -480,7 +490,7 @@ sql
             $like = (int)$this->GetParam('like', $_REQUEST);
             $comment = $this->GetParam('comment', $_REQUEST);
             $x = strlen($comment);
-            if ($like != 1 && $like != 2) throw new FrException(1, 'Illegal `like` parameter');
+            if ($like != 1 && $like != 0) throw new FrException(1, 'Illegal `like` parameter');
             $liked = null;
             $disliked = null;
             if ($like == 1)
@@ -508,6 +518,29 @@ sql
             $stmt->close();
             
             return array('result'=>1, 'likes'=>$like_n, 'dislikes'=>$dislike_n, 'comments'=>$comment_n);
+        }
+        
+        function MethodFoodViewcomment() {
+            $fid = $this->GetParam('id', $_REQUEST);
+            $stmt = $this->conn->prepare('SELECT uid,user.name,user.avatar,liked,disliked,comment,UNIX_TIMESTAMP(time) AS time FROM `foodcmt` JOIN `user` ON user.id=foodcmt.uid WHERE foodcmt.fid=? ORDER BY time DESC');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('i', $fid);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError($stmt);
+            $stmt->bind_result($uid, $name, $avatar, $liked, $disliked, $comment, $time);
+            $comments = array();
+            $r = true;
+            while ($stmt->fetch()) {
+                if (!($liked ^ $disliked)) continue;
+                if ($liked)
+                    $like = true;
+                else
+                    $like = false;
+                $comments[] = array('user'=>array('id'=>$uid, 'name'=>$name, 'avatar'=>$avatar), 'like'=>$like, 'comment'=>$comment, 'time'=>$time);
+            }
+            if ($r == false) $this->InternalError($stmt);
+            $stmt->close();
+            return array('result'=>1, 'comments'=>$comments);
         }
         
         function MethodShopMark() {
@@ -572,6 +605,8 @@ sql
                     return $this->MethodFoodModify();
                 case 'food.comment':
                     return $this->MethodFoodComment();
+                case 'food.viewcomment':
+                    return $this->MethodFoodViewcomment();
                 default:
                     throw new FrException(0x002, 'Parameter `method` is not valid');
             }
