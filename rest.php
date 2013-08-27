@@ -180,8 +180,7 @@ sql
             $stmt->bind_result($type);
             $r = $stmt->fetch();
             $stmt->close();
-            if ($r == false) $this->InternalError();
-            if ($r == NULL) throw new FrException(-1, 'Session Invalid');
+            if (!$r) throw new FrException(-1, 'Session Invalid');
             if ($owner_required && $type != 1) throw new FrException(-1, 'Guest cannot operate shops');
         }
         
@@ -189,20 +188,16 @@ sql
             $stmt = $this->conn->prepare('DELETE FROM session WHERE uid=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $uid);
-            $r = $stmt->execute();
-            if (!$r) $this->InternalError();
+            if (!$stmt->execute()) $this->InternalError();
         }
         
         function ShopOwnerCheck($shopid, $uid) {
             $stmt = $this->conn->prepare('SELECT id FROM `shop` WHERE id=? AND uid=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('ii', $uid, $shopid);
-            $r = $stmt->execute();
-            if (!$r) $this->InternalError();
-            $r = $stmt->fetch();
+            if (!$stmt->execute()) $this->InternalError();
+            if (!$stmt->fetch()) throw new FrException(-1, 'Not shopowner');
             $stmt->close();
-            if ($r == false) $this->InternalError();
-            if ($r == NULL) throw new FrException(-1, 'Not shopowner');
         }
         
         function MethodTest() {
@@ -261,8 +256,7 @@ sql
                 $stmt = $this->conn->prepare('INSERT INTO `shop` (uid,name,address,introduction,photo,phonenum) VALUES (?,?,?,?,?,?);');
                 if (!$stmt) $this->InternalError();
                 $stmt->bind_param('isssss', $uid, $blank, $blank, $blank, $blank, $blank);
-                $r = $stmt->execute();
-                if (!$r) $this->InternalError();
+                if (!$stmt->execute()) $this->InternalError();
                 $stmt->close();
             }
             return array('result'=>1, 'id'=>$uid, 'session'=>$this->MethodUserLogin(true));
@@ -275,8 +269,7 @@ sql
                 $stmt = $this->conn->prepare('SELECT id, type FROM `user` WHERE name=? AND password=?');
                 if (!$stmt) $this->InternalError();
                 $stmt->bind_param('ss', $_REQUEST['name'], $_REQUEST['password']);
-                $r = $stmt->execute();
-                if (!$r) $this->InternalError();
+                if (!$stmt->execute()) $this->InternalError();
                 $stmt->bind_result($uid, $type);
                 if (!$stmt->fetch()) throw new FrException(-1, 'Login fail 1');
                 $stmt->close();
@@ -287,8 +280,7 @@ sql
                 $stmt = $this->conn->prepare('INSERT INTO session (uid,type,sid,expire) VALUES (?,?,?,DATE_ADD(NOW(), INTERVAL 30 DAY));');
                 if (!$stmt) $this->InternalError();
                 $stmt->bind_param('iis', $uid, $type, $newses);
-                $r = $stmt->execute();
-                if (!$r) $this->InternalError();
+                if (!$stmt->execute()) $this->InternalError();
                 $stmt->close();
                 }
             else if (isset($_REQUEST['uid']) && isset($_REQUEST['session'])) {
@@ -297,19 +289,15 @@ sql
                 $stmt = $this->conn->prepare('SELECT uid FROM session WHERE uid=? AND sid=? AND expire>NOW()');
                 if (!$stmt) $this->InternalError();
                 $stmt->bind_param('is', $uid, $_REQUEST['session']);
-                $r = $stmt->execute();
-                if (!$r) $this->InternalError();
-                $r = $stmt->fetch();
+                if (!$stmt->execute()) $this->InternalError();
+                if (!$stmt->fetch()) throw new FrException(-1, 'Login fail 2');
                 $stmt->close();
-                if ($r == NULL) throw new FrException(-1, 'Login fail 2');
-                if ($r == false) $this->InternalError();
                 
                 // Refresh session
                 $stmt = $this->conn->prepare('UPDATE session SET expire=DATE_ADD(NOW(), INTERVAL 30 DAY) WHERE uid=? AND sid=?');
                 if (!$stmt) $this->InternalError();
                 $stmt->bind_param('is', $uid, $newses);
-                $r = $stmt->execute();
-                if (!$r) $this->InternalError();
+                if (!$stmt->execute()) $this->InternalError();
             }
             else throw new FrException(1, 'Wrong calling parameters');
             
@@ -319,8 +307,7 @@ sql
             $stmt = $this->conn->prepare('SELECT user.name,sex,type,avatar,school,region,shop.id FROM `user` LEFT JOIN shop ON shop.uid=user.id WHERE user.id=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $uid);
-            $r = $stmt->execute();
-            if (!$r) $this->InternalError();
+            if (!$stmt->execute()) $this->InternalError();
             $stmt->bind_result($name,$sex,$type,$avatar,$school,$region,$shopid);
             if (!$stmt->fetch()) throw new FrException(5, 'No such user');
             $stmt->close();
@@ -336,12 +323,9 @@ sql
             $stmt = $this->conn->prepare('SELECT name,password,sex,avatar,school,region FROM `user` WHERE id=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $id);
-            $r = $stmt->execute();
-            if (!$r) $this->InternalError();
+            if (!$stmt->execute()) $this->InternalError();
             $stmt->bind_result($name,$password, $sex, $avatar, $school, $region);
-            $r = $stmt->fetch();
-            if ($r == NULL) throw new FrException(5, 'No such user');
-            if ($r == false) $this->InternalError();
+            if (!$stmt->fetch()) throw new FrException(5, 'No such user');
             $stmt->close();
             
             // Update profile
@@ -357,8 +341,7 @@ sql
             $stmt = $this->conn->prepare('UPDATE `user` SET password=?, sex=?, avatar=?, school=?, region=? WHERE id=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('sisssi', $password, $sex, $avatar, $school, $region, $id);
-            $r = $stmt->execute();
-            if (!$r) $this->InternalError();
+            if (!$stmt->execute()) $this->InternalError();
             
             if ($new_password) {
                 $this->SessionReset($id);
@@ -381,8 +364,7 @@ sql
             $stmt = $this->conn->prepare('INSERT INTO `shop` (uid,name,address,introduction,photo,phonenum) VALUES (?,?,?,?,?,?);');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('issssss', $uid, $name, $address, $introduction, $photohash, $phonenum);
-            $r = $stmt->execute();
-            if (!$r) $this->InternalError();
+            if (!$stmt->execute()) $this->InternalError();
             $stmt->close();
             
             return array('result'=>1, 'id'=>$this->conn->insert_id);
@@ -394,13 +376,10 @@ sql
             $stmt = $this->conn->prepare('SELECT uid,name,address,introduction,photo,phonenum FROM `shop` WHERE id=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $id);
-            $r = $stmt->execute();
-            if (!$r) $this->InternalError();
+            if (!$stmt->execute()) $this->InternalError();
             $stmt->bind_result($uid, $name, $address, $introduction, $photohash, $phonenum);
-            $r = $stmt->fetch();
+            if (!$stmt->fetch()) throw new FrException(5, 'No such shop');
             $stmt->close();
-            if ($r == false) $this->InternalError();
-            if ($r == NULL) throw new FrException(5, 'No such shop');
             
             $name = $this->GetParam('name', $_REQUEST, false, $name);
             $address = $this->GetParam('address', $_REQUEST, false, $address);
@@ -412,8 +391,7 @@ sql
             $stmt = $this->conn->prepare('UPDATE shop SET name=?,address=?,introduction=?,photo=?,phonenum=? WHERE id=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('sssssi', $name, $address, $introduction, $photohash, $phonenum, $id);
-            $r = $stmt->execute();
-            if (!$r) $this->InternalError();
+            if (!$stmt->execute()) $this->InternalError();
             $stmt->close();
             return array('result'=>1);
         }
@@ -425,8 +403,7 @@ sql
             $stmt = $this->conn->prepare('DELETE FROM `shop` WHERE id=? AND uid=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('ii', $id, $uid);
-            $r = $stmt->execute();
-            if (!$r) $this->InternalError();
+            if (!$stmt->execute()) $this->InternalError();
             $stmt->close();
             return array('result'=>1);
         }
@@ -445,8 +422,7 @@ sql
             $stmt = $this->conn->prepare('INSERT INTO `food` (shopid,name,introduction,price,photo,special) VALUES (?,?,?,?,?,?);');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('issdsi', $shopid, $name, $introduction, $price, $photohash, $special);
-            $r = $stmt->execute();
-            if (!$r) $this->InternalError();
+            if (!$stmt->execute()) $this->InternalError();
             $stmt->close();
             
             $fid = $this->conn->insert_id;
@@ -460,12 +436,9 @@ sql
             $stmt = $this->conn->prepare('SELECT shopid,name,introduction,price,photo,special FROM `food` WHERE id=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $fid);
-            $r = $stmt->execute();
-            if (!$r) $this->InternalError();
+            if (!$stmt->execute()) $this->InternalError();
             $stmt->bind_result($shopid, $name, $introduction, $price, $photohash, $special);
-            $r = $stmt->fetch();
-            if ($r == false) $this->InternalError();
-            if ($r == NULL) throw new FrException(5, 'No such food');
+            if (!$stmt->fetch()) throw new FrException(5, 'No such food');
             $stmt->close();
             
             $this->ShopOwnerCheck($shopid, $uid);
@@ -481,8 +454,7 @@ sql
             $stmt = $this->conn->prepare('UPDATE `food` SET shopid=?,name=?,introduction=?,price=?,photo=?,special=? WHERE id=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('issdsii', $shopid, $name, $introduction, $price, $photohash, $special, $fid);
-            $r = $stmt->execute();
-            if (!$r) $this->InternalError();
+            if (!$stmt->execute()) $this->InternalError();
             return array('result'=>1);
         }
         
@@ -505,19 +477,21 @@ sql
             $stmt = $this->conn->prepare('INSERT INTO `foodcmt` (uid,fid,liked,disliked,comment,time) VALUES (?,?,?,?,?,NOW());');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('iiiis', $uid, $fid, $liked, $disliked, $comment);
-            $r = $stmt->execute();
-            if (!$r) $this->InternalError();
+            if (!$stmt->execute()) {
+                // Foreign key constraint fails(no such food)
+                if ($stmt->errno == 1452)
+                    throw new FrException(5, 'No such food');
+                else
+                    $this->InternalError();
+            }
             $stmt->close();
             
             $stmt = $this->conn->prepare('SELECT COUNT(liked), COUNT(disliked), COUNT(comment) FROM `foodcmt` WHERE fid=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $fid);
-            $r = $stmt->execute();
-            if (!$r) $this->InternalError();
+            if (!$stmt->execute()) $this->InternalError();
             $stmt->bind_result($like_n, $dislike_n, $comment_n);
-            $r = $stmt->fetch();
-            if ($r == false) $this->InternalError();
-            if ($r == null) throw new FrException(5, 'No such food found');
+            if (!$stmt->fetch()) $this->InternalError();
             $stmt->close();
             
             return array('result'=>1, 'likes'=>$like_n, 'dislikes'=>$dislike_n, 'comments'=>$comment_n);
@@ -528,11 +502,9 @@ sql
             $stmt = $this->conn->prepare('SELECT uid,user.name,user.avatar,liked,disliked,comment,UNIX_TIMESTAMP(time) AS time FROM `foodcmt` JOIN `user` ON user.id=foodcmt.uid WHERE foodcmt.fid=? ORDER BY time DESC');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $fid);
-            $r = $stmt->execute();
-            if (!$r) $this->InternalError($stmt);
+            if (!$stmt->execute()) $this->InternalError($stmt);
             $stmt->bind_result($uid, $name, $avatar, $liked, $disliked, $comment, $time);
             $comments = array();
-            $r = true;
             while ($stmt->fetch()) {
                 if (!($liked ^ $disliked)) continue;
                 if ($liked)
@@ -541,7 +513,6 @@ sql
                     $like = false;
                 $comments[] = array('user'=>array('id'=>$uid, 'name'=>$name, 'avatar'=>$avatar), 'like'=>$like, 'comment'=>$comment, 'time'=>$time);
             }
-            if ($r == false) $this->InternalError($stmt);
             $stmt->close();
             return array('result'=>1, 'comments'=>$comments);
         }
@@ -556,28 +527,56 @@ sql
             $stmt = $this->conn->prepare('DELETE FROM `shopmark` WHERE shopid=? AND uid=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('ii', $shopid, $uid);
-            $r = $stmt->execute();
-            if (!$r) $this->InternalError();
+            if (!$stmt->execute()) $this->InternalError();
             $stmt->close();
             
             $stmt = $this->conn->prepare('INSERT INTO `shopmark` (shopid,uid,mark) VALUES (?,?,?);');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('iii', $shopid, $uid, $mark);
-            $r = $stmt->execute();
-            if (!$r) $this->InternalError();
+            if (!$stmt->execute()) {
+                // Foreign key constraint fails(no such shop)
+                if ($stmt->errno == 1452)
+                    throw new FrException(5, 'No such shop');
+                else
+                    $this->InternalError();
+            }
             $stmt->close();
             
             $stmt = $this->conn->prepare('SELECT AVG(mark) FROM `shopmark` WHERE shopid=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $shopid);
-            $r = $stmt->execute();
-            if (!$r) $this->InternalError();
+            if (!$stmt->execute()) $this->InternalError();
             $stmt->bind_result($average);
-            $r = $stmt->fetch();
-            if ($r != true) $this->InternalError();
+            if (!$stmt->fetch()) $this->InternalError();
             $stmt->close();
             
             return array('result'=>1, 'newmark'=>$average);
+        }
+        
+        function MethodShopDetail() {
+            $this->SessionCheck($_REQUEST);
+            $uid = $this->GetParam('uid', $_REQUEST);
+            $shopid = $this->GetParam('id', $_REQUEST);
+            
+            // Fetch general information
+            $stmt = $this->conn->prepare('SELECT name,address,introduction,photo,phonenum,shopavg.mark,shopavg.popularity FROM `shop` LEFT JOIN (SELECT shopid,COUNT(*) AS popularity, AVG(mark) AS mark FROM `shopmark` GROUP BY shopid) shopavg ON shopavg.shopid=shop.id WHERE shop.id=?');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('i', $shopid);
+            if (!$stmt->execute()) $this->InternalError();
+            $stmt->bind_result($name, $address, $introduction, $photo, $phonenum, $mark, $popularity);
+            if (!$stmt->fetch()) throw new FrException(5, 'No such shop');
+            $stmt->close();
+            
+            // Fetch current user's mark
+            $stmt = $this->conn->prepare('SELECT mark FROM `shopmark` WHERE shopid=? AND uid=?');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('ii', $shopid, $uid);
+            if (!$stmt->execute()) $this->InternalError();
+            $stmt->bind_result($user_mark);
+            if (!$stmt->fetch()) $user_mark = -1;
+            $stmt->close();
+            
+            
         }
         
         function MainHandler() {
@@ -600,6 +599,8 @@ sql
                     return $this->MethodShopModify();
                 //case 'shop.delete':
                 //    return $this->MethodShopDelete();
+                case 'shop.detail':
+                    return $this->MethodShopDetail();
                 case 'shop.mark':
                     return $this->MethodShopMark();
                 case 'food.create':
