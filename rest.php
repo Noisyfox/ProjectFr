@@ -86,6 +86,7 @@ sql
                     id INT PRIMARY KEY AUTO_INCREMENT,
                     shopid INT,
                     name VARCHAR(50),
+                    introduction TEXT,
                     price DECIMAL(5,2),
                     photo CHAR(40),
                     special BOOL,
@@ -436,13 +437,14 @@ sql
             $shopid = (int)$this->GetParam('id', $_REQUEST);
             $this->ShopOwnerCheck($shopid, $uid);
             $name = $this->GetParam('name', $_REQUEST);
+            $introduction = $this->GetParam('introduction', $_REQUEST);
             $price = (float)$this->GetParam('price', $_REQUEST);
             $photohash = $this->ImageSave($this->GetUploadfile('photo'));
             $special = (int)$this->GetParam('special', $_REQUEST);
             
-            $stmt = $this->conn->prepare('INSERT INTO `food` (shopid,name,price,photo,special) VALUES (?,?,?,?,?);');
+            $stmt = $this->conn->prepare('INSERT INTO `food` (shopid,name,introduction,price,photo,special) VALUES (?,?,?,?,?,?);');
             if (!$stmt) $this->InternalError();
-            $stmt->bind_param('isdsi', $shopid, $name, $price, $photohash, $special);
+            $stmt->bind_param('issdsi', $shopid, $name, $introduction, $price, $photohash, $special);
             $r = $stmt->execute();
             if (!$r) $this->InternalError();
             $stmt->close();
@@ -455,12 +457,12 @@ sql
             $this->SessionCheck($_REQUEST, true);
             $uid = (int)$this->GetParam('uid', $_REQUEST);
             $fid = (int)$this->GetParam('id', $_REQUEST);
-            $stmt = $this->conn->prepare('SELECT shopid,name,price,photo,special FROM `food` WHERE id=?');
+            $stmt = $this->conn->prepare('SELECT shopid,name,introduction,price,photo,special FROM `food` WHERE id=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $fid);
             $r = $stmt->execute();
             if (!$r) $this->InternalError();
-            $stmt->bind_result($shopid, $name, $price, $photohash, $special);
+            $stmt->bind_result($shopid, $name, $introduction, $price, $photohash, $special);
             $r = $stmt->fetch();
             if ($r == false) $this->InternalError();
             if ($r == NULL) throw new FrException(5, 'No such food');
@@ -468,6 +470,7 @@ sql
             
             $this->ShopOwnerCheck($shopid, $uid);
             $name = $this->GetParam('name', $_REQUEST, false, $name);
+            $introduction = $this->GetParam('introduction', $_REQUEST, false, $introduction);
             $price_t = $this->GetParam('price', $_REQUEST, false);
             if ($price_t) $price = (float)$price_t;
             $special_t = $this->GetParam('special', $_REQUEST, false);
@@ -475,9 +478,9 @@ sql
             $photo_t = $this->GetUploadfile('photo', false);
             if ($photo_t) $photohash = $this->ImageSave($photo_t);
             
-            $stmt = $this->conn->prepare('UPDATE `food` SET shopid=?,name=?,price=?,photo=?,special=? WHERE id=?');
+            $stmt = $this->conn->prepare('UPDATE `food` SET shopid=?,name=?,introduction=?,price=?,photo=?,special=? WHERE id=?');
             if (!$stmt) $this->InternalError();
-            $stmt->bind_param('isdsii', $shopid, $name, $price, $photohash, $special, $fid);
+            $stmt->bind_param('issdsii', $shopid, $name, $introduction, $price, $photohash, $special, $fid);
             $r = $stmt->execute();
             if (!$r) $this->InternalError();
             return array('result'=>1);
