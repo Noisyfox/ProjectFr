@@ -103,6 +103,20 @@ sql
                 );
 sql
                 );
+            $this->conn->query(<<<sql
+                CREATE TABLE IF NOT EXISTS `foodcmt` (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    uid INT,
+                    fid INT,
+                    liked BOOL,
+                    disliked BOOL,
+                    comment TEXT,
+                    time DATETIME,
+                    CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(id),
+                    CONSTRAINT FOREIGN KEY(fid) references `food`(id) ON DELETE CASCADE
+                ) DEFAULT CHARSET=UTF8;
+sql
+            );
         }
         
         function GetParam($key, &$data, $force = true, $default = false) {
@@ -459,6 +473,43 @@ sql
             return array('result'=>1);
         }
         
+        function MethodFoodComment() {
+            $this->SessionCheck($_REQUEST);
+            $fid = (int)$this->GetParam('id', $_REQUEST);
+            $uid = (int)$this->GetParam('uid', $_REQUEST);
+            $like = (int)$this->GetParam('like', $_REQUEST);
+            $comment = $this->GetParam('comment', $_REQUEST);
+            $x = strlen($comment);
+            if ($like != 1 && $like != 2) throw new FrException(1, 'Illegal `like` parameter');
+            $liked = null;
+            $disliked = null;
+            if ($like == 1)
+                $liked = true;
+            else
+                $disliked = true;
+            if (strlen($comment) == 0) $comment = null;
+            
+            $stmt = $this->conn->prepare('INSERT INTO `foodcmt` (uid,fid,liked,disliked,comment,time) VALUES (?,?,?,?,?,NOW());');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('iiiis', $uid, $fid, $liked, $disliked, $comment);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError();
+            $stmt->close();
+            
+            $stmt = $this->conn->prepare('SELECT COUNT(liked), COUNT(disliked), COUNT(comment) FROM `foodcmt` WHERE fid=?');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('i', $fid);
+            $r = $stmt->execute();
+            if (!$r) $this->InternalError();
+            $stmt->bind_result($like_n, $dislike_n, $comment_n);
+            $r = $stmt->fetch();
+            if ($r == false) $this->InternalError();
+            if ($r == null) throw new FrException(5, 'No such food found');
+            $stmt->close();
+            
+            return array('result'=>1, 'likes'=>$like_n, 'dislikes'=>$dislike_n, 'comments'=>$comment_n);
+        }
+        
         function MethodShopMark() {
             $this->SessionCheck($_REQUEST);
             $shopid = (int)$this->GetParam('id', $_REQUEST);
@@ -519,6 +570,8 @@ sql
                     return $this->MethodFoodCreate();
                 case 'food.modify':
                     return $this->MethodFoodModify();
+                case 'food.comment':
+                    return $this->MethodFoodComment();
                 default:
                     throw new FrException(0x002, 'Parameter `method` is not valid');
             }

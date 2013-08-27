@@ -177,5 +177,19 @@
                 <input type="submit" value="Submit" />
             </form>
         </div>
+        <div>
+            <p>Food Comment</p>
+            <form action="rest.php" method="post" enctype="multipart/form-data">
+                Method: <input name="method" type="text" value="food.comment" /><br />
+                UID: <input name="uid" type="text" value="1" /><br />
+                Session: <input name="session" type="text" /><br />
+                Food id: <input name="id" type="text" value="1" /><br />
+                Comment: <input name="comment" type="text" value="Yummy" /><br />
+                Special: 
+                    <input name="like" type="radio" value="1" checked>Like
+                    <input name="like" type="radio" value="0">Dislike
+                <input type="submit" value="Submit" />
+            </form>
+        </div>
     </body>
 </html>
