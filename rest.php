@@ -58,7 +58,7 @@
                     UNIQUE KEY `name`(`name`)
                 ) DEFAULT CHARSET=UTF8;
 sql
-                );
+            );
             $this->conn->query(<<<sql
                 CREATE TABLE IF NOT EXISTS `session` (
                     sid CHAR(40) NOT NULL,
@@ -68,7 +68,7 @@ sql
                     CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(id)
                 );
 sql
-                );
+            );
             $this->conn->query(<<<sql
                 CREATE TABLE IF NOT EXISTS `shop`(
                     id INT PRIMARY KEY AUTO_INCREMENT,
@@ -80,7 +80,7 @@ sql
                     CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(id)
                 ) DEFAULT CHARSET=UTF8;
 sql
-                );
+            );
             $this->conn->query(<<<sql
                 CREATE TABLE IF NOT EXISTS `food` (
                     id INT PRIMARY KEY AUTO_INCREMENT,
@@ -93,7 +93,7 @@ sql
                     CONSTRAINT FOREIGN KEY(shopid) REFERENCES `shop`(id)
                 ) DEFAULT CHARSET=UTF8;
 sql
-                );
+            );
             $this->conn->query(<<<sql
                 CREATE TABLE IF NOT EXISTS `shopmark` (
                     id INT PRIMARY KEY AUTO_INCREMENT,
@@ -104,7 +104,7 @@ sql
                     CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(id)
                 );
 sql
-                );
+            );
             $this->conn->query(<<<sql
                 CREATE TABLE IF NOT EXISTS `foodcmt` (
                     id INT PRIMARY KEY AUTO_INCREMENT,
@@ -117,6 +117,26 @@ sql
                     CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(id),
                     CONSTRAINT FOREIGN KEY(fid) references `food`(id) ON DELETE CASCADE
                 ) DEFAULT CHARSET=UTF8;
+sql
+            );
+            $this->conn->query(<<<sql
+                CREATE TABLE IF NOT EXISTS bookmark_shop (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    uid INT,
+                    sid INT,
+                    CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(id),
+                    CONSTRAINT FOREIGN KEY(sid) REFERENCES `shop`(id)
+                )
+sql
+            );
+            $this->conn->query(<<<sql
+                CREATE TABLE IF NOT EXISTS bookmark_food (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    uid INT,
+                    fid INT,
+                    CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(id),
+                    CONSTRAINT FOREIGN KEY(fid) REFERENCES `food`(id) ON DELETE CASCADE
+                )
 sql
             );
         }
@@ -555,8 +575,8 @@ sql
         
         function MethodShopDetail() {
             $this->SessionCheck($_REQUEST);
-            $uid = $this->GetParam('uid', $_REQUEST);
-            $shopid = $this->GetParam('id', $_REQUEST);
+            $uid = (int)$this->GetParam('uid', $_REQUEST);
+            $shopid = (int)$this->GetParam('id', $_REQUEST);
             
             // Fetch general information
             $stmt = $this->conn->prepare('SELECT name,address,introduction,photo,phonenum,shopavg.mark,shopavg.popularity FROM `shop` LEFT JOIN (SELECT shopid,COUNT(*) AS popularity, AVG(mark) AS mark FROM `shopmark` GROUP BY shopid) shopavg ON shopavg.shopid=shop.id WHERE shop.id=?');
@@ -577,6 +597,27 @@ sql
             $stmt->close();
             
             
+        }
+        
+        function MethodBookmarkAdd() {
+            $this->SessionCheck($_REQUEST);
+            $uid = (int)$this->GetParam('uid', $_REQUEST);
+            $id = (int)$this->GetParam('id', $_REQUEST);
+            $type = $this->GetParam('type', $_REQUEST);
+            if ($type != 'food' && $type != 'shop') throw new FrException(5, 'Unknown bookmark type');
+            
+            $stmt = $this->conn->prepare('INSERT INTO `bookmark_'.$type.'` ('.$type[0].'id, uid) VALUES (?,?)');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('ii', $id, $uid);
+            if (!$stmt->execute()) {
+                // Foreign key constraint fails(no such user/food/shop)
+                if ($stmt->errno == 1452)
+                    throw new FrException(5, 'No such user/food/shop');
+                else
+                    $this->InternalError();
+            }
+            $stmt->close();
+            return array('result'=>1);
         }
         
         function MainHandler() {
@@ -611,6 +652,8 @@ sql
                     return $this->MethodFoodComment();
                 case 'food.viewcomment':
                     return $this->MethodFoodViewcomment();
+                case 'bookmark.add':
+                    return $this->MethodBookmarkAdd();
                 default:
                     throw new FrException(0x002, 'Parameter `method` is not valid');
             }
