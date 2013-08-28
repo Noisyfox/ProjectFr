@@ -43,6 +43,18 @@
             $this->InitTable();
         }
         
+        function DatabaseReset() {
+            if (!$this->conn->query('DROP TABLE `bookmark_food`;')) $this->InternalError();
+            if (!$this->conn->query('DROP TABLE `bookmark_shop`;')) $this->InternalError();
+            if (!$this->conn->query('DROP TABLE `foodcmt`;')) $this->InternalError();
+            if (!$this->conn->query('DROP TABLE `shopmark`;')) $this->InternalError();
+            if (!$this->conn->query('DROP TABLE `food`;')) $this->InternalError();
+            if (!$this->conn->query('DROP TABLE `shop`;')) $this->InternalError();
+            if (!$this->conn->query('DROP TABLE `session`;')) $this->InternalError();
+            if (!$this->conn->query('DROP TABLE `user`;')) $this->InternalError();
+            return array('result'=>1);
+        }
+        
         function InitTable() {
             // $this->conn->query('CREATE TABLE IF NOT EXISTS `image` (`uid` CHAR(40) NOT NULL, `img` LONGBLOB, UNIQUE KEY `uid` (`uid`)) COLLATE utf8_general_ci;');
             if (!$this->conn->query(<<<sql
@@ -642,10 +654,12 @@ sql
         
         function MainHandler() {
             $this->Connect();
-            $method = $this->GetParam('method', $_POST);
+            $method = $this->GetParam('method', $_REQUEST);
             switch ($method) {
                 case 'test':
                     return $this->MethodTest();
+                case 'database.reset':
+                    return $this->DatabaseReset();
                 case 'image':
                     return $this->ImageGet();
                 case 'user.register':
