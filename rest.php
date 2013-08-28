@@ -45,7 +45,7 @@
         
         function InitTable() {
             // $this->conn->query('CREATE TABLE IF NOT EXISTS `image` (`uid` CHAR(40) NOT NULL, `img` LONGBLOB, UNIQUE KEY `uid` (`uid`)) COLLATE utf8_general_ci;');
-            $this->conn->query(<<<sql
+            if (!$this->conn->query(<<<sql
                 CREATE TABLE IF NOT EXISTS `user` (
                     uid INT AUTO_INCREMENT PRIMARY KEY,
                     name CHAR(50),
@@ -58,8 +58,8 @@
                     UNIQUE KEY `name`(`name`)
                 ) DEFAULT CHARSET=UTF8;
 sql
-            );
-            $this->conn->query(<<<sql
+            )) $this->InternalError();
+            if (!$this->conn->query(<<<sql
                 CREATE TABLE IF NOT EXISTS `session` (
                     sid CHAR(40) NOT NULL,
                     uid INT,
@@ -68,8 +68,8 @@ sql
                     CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(uid)
                 );
 sql
-            );
-            $this->conn->query(<<<sql
+            )) $this->InternalError();
+            if (!$this->conn->query(<<<sql
                 CREATE TABLE IF NOT EXISTS `shop`(
                     sid INT PRIMARY KEY AUTO_INCREMENT,
                     uid INT, name VARCHAR(200),
@@ -80,8 +80,8 @@ sql
                     CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(uid)
                 ) DEFAULT CHARSET=UTF8;
 sql
-            );
-            $this->conn->query(<<<sql
+            )) $this->InternalError();
+            if (!$this->conn->query(<<<sql
                 CREATE TABLE IF NOT EXISTS `food` (
                     fid INT PRIMARY KEY AUTO_INCREMENT,
                     sid INT,
@@ -93,8 +93,8 @@ sql
                     CONSTRAINT FOREIGN KEY(sid) REFERENCES `shop`(sid)
                 ) DEFAULT CHARSET=UTF8;
 sql
-            );
-            $this->conn->query(<<<sql
+            )) $this->InternalError();
+            if (!$this->conn->query(<<<sql
                 CREATE TABLE IF NOT EXISTS `shopmark` (
                     id INT PRIMARY KEY AUTO_INCREMENT,
                     sid INT,
@@ -104,8 +104,8 @@ sql
                     CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(uid)
                 );
 sql
-            );
-            $this->conn->query(<<<sql
+            )) $this->InternalError();
+            if (!$this->conn->query(<<<sql
                 CREATE TABLE IF NOT EXISTS `foodcmt` (
                     id INT PRIMARY KEY AUTO_INCREMENT,
                     uid INT,
@@ -118,8 +118,8 @@ sql
                     CONSTRAINT FOREIGN KEY(fid) references `food`(fid) ON DELETE CASCADE
                 ) DEFAULT CHARSET=UTF8;
 sql
-            );
-            $this->conn->query(<<<sql
+            )) $this->InternalError();
+            if (!$this->conn->query(<<<sql
                 CREATE TABLE IF NOT EXISTS bookmark_shop (
                     id INT PRIMARY KEY AUTO_INCREMENT,
                     uid INT,
@@ -128,8 +128,8 @@ sql
                     CONSTRAINT FOREIGN KEY(sid) REFERENCES `shop`(sid)
                 )
 sql
-            );
-            $this->conn->query(<<<sql
+            )) $this->InternalError();
+            if (!$this->conn->query(<<<sql
                 CREATE TABLE IF NOT EXISTS bookmark_food (
                     id INT PRIMARY KEY AUTO_INCREMENT,
                     uid INT,
@@ -138,7 +138,7 @@ sql
                     CONSTRAINT FOREIGN KEY(fid) REFERENCES `food`(fid) ON DELETE CASCADE
                 )
 sql
-            );
+            )) $this->InternalError();
         }
         
         function GetParam($key, &$data, $force = true, $default = false) {
