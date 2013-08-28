@@ -47,7 +47,7 @@
             // $this->conn->query('CREATE TABLE IF NOT EXISTS `image` (`uid` CHAR(40) NOT NULL, `img` LONGBLOB, UNIQUE KEY `uid` (`uid`)) COLLATE utf8_general_ci;');
             $this->conn->query(<<<sql
                 CREATE TABLE IF NOT EXISTS `user` (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    uid INT AUTO_INCREMENT PRIMARY KEY,
                     name CHAR(50),
                     password CHAR(40),
                     sex INT,
@@ -65,43 +65,43 @@ sql
                     uid INT,
                     expire DATETIME,
                     type INT,
-                    CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(id)
+                    CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(uid)
                 );
 sql
             );
             $this->conn->query(<<<sql
                 CREATE TABLE IF NOT EXISTS `shop`(
-                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    sid INT PRIMARY KEY AUTO_INCREMENT,
                     uid INT, name VARCHAR(200),
                     address VARCHAR(200),
                     introduction TEXT,
                     photo CHAR(40),
                     phonenum VARCHAR(50),
-                    CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(id)
+                    CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(uid)
                 ) DEFAULT CHARSET=UTF8;
 sql
             );
             $this->conn->query(<<<sql
                 CREATE TABLE IF NOT EXISTS `food` (
-                    id INT PRIMARY KEY AUTO_INCREMENT,
-                    shopid INT,
+                    fid INT PRIMARY KEY AUTO_INCREMENT,
+                    sid INT,
                     name VARCHAR(50),
                     introduction TEXT,
                     price DECIMAL(5,2),
                     photo CHAR(40),
                     special BOOL,
-                    CONSTRAINT FOREIGN KEY(shopid) REFERENCES `shop`(id)
+                    CONSTRAINT FOREIGN KEY(sid) REFERENCES `shop`(sid)
                 ) DEFAULT CHARSET=UTF8;
 sql
             );
             $this->conn->query(<<<sql
                 CREATE TABLE IF NOT EXISTS `shopmark` (
                     id INT PRIMARY KEY AUTO_INCREMENT,
-                    shopid INT,
+                    sid INT,
                     uid INT,
                     mark INT,
-                    CONSTRAINT FOREIGN KEY(shopid) REFERENCES `shop`(id),
-                    CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(id)
+                    CONSTRAINT FOREIGN KEY(sid) REFERENCES `shop`(sid),
+                    CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(uid)
                 );
 sql
             );
@@ -114,8 +114,8 @@ sql
                     disliked BOOL,
                     comment TEXT,
                     time DATETIME,
-                    CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(id),
-                    CONSTRAINT FOREIGN KEY(fid) references `food`(id) ON DELETE CASCADE
+                    CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(uid),
+                    CONSTRAINT FOREIGN KEY(fid) references `food`(fid) ON DELETE CASCADE
                 ) DEFAULT CHARSET=UTF8;
 sql
             );
@@ -124,8 +124,8 @@ sql
                     id INT PRIMARY KEY AUTO_INCREMENT,
                     uid INT,
                     sid INT,
-                    CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(id),
-                    CONSTRAINT FOREIGN KEY(sid) REFERENCES `shop`(id)
+                    CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(uid),
+                    CONSTRAINT FOREIGN KEY(sid) REFERENCES `shop`(sid)
                 )
 sql
             );
@@ -134,8 +134,8 @@ sql
                     id INT PRIMARY KEY AUTO_INCREMENT,
                     uid INT,
                     fid INT,
-                    CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(id),
-                    CONSTRAINT FOREIGN KEY(fid) REFERENCES `food`(id) ON DELETE CASCADE
+                    CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(uid),
+                    CONSTRAINT FOREIGN KEY(fid) REFERENCES `food`(fid) ON DELETE CASCADE
                 )
 sql
             );
@@ -212,9 +212,9 @@ sql
         }
         
         function ShopOwnerCheck($shopid, $uid) {
-            $stmt = $this->conn->prepare('SELECT id FROM `shop` WHERE id=? AND uid=?');
+            $stmt = $this->conn->prepare('SELECT sid FROM `shop` WHERE sid=? AND uid=?');
             if (!$stmt) $this->InternalError();
-            $stmt->bind_param('ii', $uid, $shopid);
+            $stmt->bind_param('ii', $shopid, $uid);
             if (!$stmt->execute()) $this->InternalError();
             if (!$stmt->fetch()) throw new FrException(-1, 'Not shopowner');
             $stmt->close();
@@ -279,14 +279,14 @@ sql
                 if (!$stmt->execute()) $this->InternalError();
                 $stmt->close();
             }
-            return array('result'=>1, 'id'=>$uid, 'session'=>$this->MethodUserLogin(true));
+            return array('result'=>1, 'uid'=>$uid, 'session'=>$this->MethodUserLogin(true));
         }
         
         function MethodUserLogin($session_only = false) {
             // Authenticate
             $uid = 0;
             if (isset($_REQUEST['name']) && isset($_REQUEST['password'])) {
-                $stmt = $this->conn->prepare('SELECT id, type FROM `user` WHERE name=? AND password=?');
+                $stmt = $this->conn->prepare('SELECT uid, type FROM `user` WHERE name=? AND password=?');
                 if (!$stmt) $this->InternalError();
                 $stmt->bind_param('ss', $_REQUEST['name'], $_REQUEST['password']);
                 if (!$stmt->execute()) $this->InternalError();
@@ -324,27 +324,27 @@ sql
             if ($session_only) return $newses;
 
             // Return user info
-            $stmt = $this->conn->prepare('SELECT user.name,sex,type,avatar,school,region,shop.id FROM `user` LEFT JOIN shop ON shop.uid=user.id WHERE user.id=?');
+            $stmt = $this->conn->prepare('SELECT user.name,sex,type,avatar,school,region,shop.sid FROM `user` LEFT JOIN shop ON shop.uid=user.uid WHERE user.uid=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $uid);
             if (!$stmt->execute()) $this->InternalError();
             $stmt->bind_result($name,$sex,$type,$avatar,$school,$region,$shopid);
             if (!$stmt->fetch()) throw new FrException(5, 'No such user');
             $stmt->close();
-            $result = array('result'=>1, 'id'=>$uid, 'session'=>$newses, 'sex'=>$sex, 'type'=>$type, 'avatar'=>$avatar, 'school'=>$school, 'region'=>$region);
-            if ($result['type'] == 1) $result['shopid'] = $shopid;
+            $result = array('result'=>1, 'uid'=>$uid, 'session'=>$newses, 'sex'=>$sex, 'type'=>$type, 'avatar'=>$avatar, 'school'=>$school, 'region'=>$region);
+            if ($result['type'] == 1) $result['sid'] = $shopid;
             return $result;
         }
         
         function MethodUserModify() {
             // Get original profile
             $this->SessionCheck($_REQUEST);
-            $id = (int)$this->GetParam('uid', $_REQUEST);
-            $stmt = $this->conn->prepare('SELECT name,password,sex,avatar,school,region FROM `user` WHERE id=?');
+            $uid = (int)$this->GetParam('uid', $_REQUEST);
+            $stmt = $this->conn->prepare('SELECT name,password,sex,avatar,school,region FROM `user` WHERE uid=?');
             if (!$stmt) $this->InternalError();
-            $stmt->bind_param('i', $id);
+            $stmt->bind_param('i', $uid);
             if (!$stmt->execute()) $this->InternalError();
-            $stmt->bind_result($name,$password, $sex, $avatar, $school, $region);
+            $stmt->bind_result($name, $password, $sex, $avatar, $school, $region);
             if (!$stmt->fetch()) throw new FrException(5, 'No such user');
             $stmt->close();
             
@@ -358,13 +358,13 @@ sql
                 $avatar = $this->ImageSave($_FILES['avatar']['tmp_name']);
             }
             
-            $stmt = $this->conn->prepare('UPDATE `user` SET password=?, sex=?, avatar=?, school=?, region=? WHERE id=?');
+            $stmt = $this->conn->prepare('UPDATE `user` SET password=?, sex=?, avatar=?, school=?, region=? WHERE uid=?');
             if (!$stmt) $this->InternalError();
-            $stmt->bind_param('sisssi', $password, $sex, $avatar, $school, $region, $id);
+            $stmt->bind_param('sisssi', $password, $sex, $avatar, $school, $region, $uid);
             if (!$stmt->execute()) $this->InternalError();
             
             if ($new_password) {
-                $this->SessionReset($id);
+                $this->SessionReset($uid);
                 $_REQUEST['name'] = $name;
                 $session = $this->MethodUserLogin(true);
             }
@@ -373,6 +373,8 @@ sql
         }
         
         function MethodShopCreate() {
+            throw new FrException(1, 'Method disabled');
+        
             $this->SessionCheck($_REQUEST, true);
             $uid = (int)$this->GetParam('uid', $_REQUEST);
             $name = $this->GetParam('name', $_REQUEST);
@@ -387,15 +389,18 @@ sql
             if (!$stmt->execute()) $this->InternalError();
             $stmt->close();
             
-            return array('result'=>1, 'id'=>$this->conn->insert_id);
+            return array('result'=>1, 'sid'=>$this->conn->insert_id);
         }
         
         function MethodShopModify() {
             $this->SessionCheck($_REQUEST, true);
-            $id = (int)$this->GetParam('id', $_REQUEST);
-            $stmt = $this->conn->prepare('SELECT uid,name,address,introduction,photo,phonenum FROM `shop` WHERE id=?');
+            $sid = (int)$this->GetParam('sid', $_REQUEST);
+            $uid = (int)$this->GetParam('uid', $_REQUEST);
+            $this->ShopOwnerCheck($sid, $uid);
+            
+            $stmt = $this->conn->prepare('SELECT uid,name,address,introduction,photo,phonenum FROM `shop` WHERE sid=?');
             if (!$stmt) $this->InternalError();
-            $stmt->bind_param('i', $id);
+            $stmt->bind_param('i', $sid);
             if (!$stmt->execute()) $this->InternalError();
             $stmt->bind_result($uid, $name, $address, $introduction, $photohash, $phonenum);
             if (!$stmt->fetch()) throw new FrException(5, 'No such shop');
@@ -408,21 +413,25 @@ sql
             $photo_tmp = $this->GetUploadfile('photo', false);
             if ($photo_tmp) $photohash = $this->ImageSave($photo_tmp);
             
-            $stmt = $this->conn->prepare('UPDATE shop SET name=?,address=?,introduction=?,photo=?,phonenum=? WHERE id=?');
+            $stmt = $this->conn->prepare('UPDATE shop SET name=?,address=?,introduction=?,photo=?,phonenum=? WHERE sid=?');
             if (!$stmt) $this->InternalError();
-            $stmt->bind_param('sssssi', $name, $address, $introduction, $photohash, $phonenum, $id);
+            $stmt->bind_param('sssssi', $name, $address, $introduction, $photohash, $phonenum, $sid);
             if (!$stmt->execute()) $this->InternalError();
             $stmt->close();
             return array('result'=>1);
         }
         
         function MethodShopDelete() {
+            throw new FrException(1, 'Method disabled');
+        
             $this->SessionCheck($_REQUEST, true);
-            $id = (int)$this->GetParam('id', $_REQUEST);
+            $sid = (int)$this->GetParam('id', $_REQUEST);
             $uid = (int)$this->GetParam('uid', $_REQUEST);
-            $stmt = $this->conn->prepare('DELETE FROM `shop` WHERE id=? AND uid=?');
+            $this->ShopOwnerCheck($sid, $uid);
+            
+            $stmt = $this->conn->prepare('DELETE FROM `shop` WHERE sid=? AND uid=?');
             if (!$stmt) $this->InternalError();
-            $stmt->bind_param('ii', $id, $uid);
+            $stmt->bind_param('ii', $sid, $uid);
             if (!$stmt->execute()) $this->InternalError();
             $stmt->close();
             return array('result'=>1);
@@ -431,7 +440,7 @@ sql
         function MethodFoodCreate() {
             $this->SessionCheck($_REQUEST, true);
             $uid = (int)$this->GetParam('uid', $_REQUEST);
-            $shopid = (int)$this->GetParam('id', $_REQUEST);
+            $shopid = (int)$this->GetParam('sid', $_REQUEST);
             $this->ShopOwnerCheck($shopid, $uid);
             $name = $this->GetParam('name', $_REQUEST);
             $introduction = $this->GetParam('introduction', $_REQUEST);
@@ -439,21 +448,21 @@ sql
             $photohash = $this->ImageSave($this->GetUploadfile('photo'));
             $special = (int)$this->GetParam('special', $_REQUEST);
             
-            $stmt = $this->conn->prepare('INSERT INTO `food` (shopid,name,introduction,price,photo,special) VALUES (?,?,?,?,?,?);');
+            $stmt = $this->conn->prepare('INSERT INTO `food` (sid,name,introduction,price,photo,special) VALUES (?,?,?,?,?,?);');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('issdsi', $shopid, $name, $introduction, $price, $photohash, $special);
             if (!$stmt->execute()) $this->InternalError();
             $stmt->close();
             
             $fid = $this->conn->insert_id;
-            return array('result'=>1, 'id'=>$fid);
+            return array('result'=>1, 'fid'=>$fid);
         }
         
         function MethodFoodModify() {
             $this->SessionCheck($_REQUEST, true);
             $uid = (int)$this->GetParam('uid', $_REQUEST);
-            $fid = (int)$this->GetParam('id', $_REQUEST);
-            $stmt = $this->conn->prepare('SELECT shopid,name,introduction,price,photo,special FROM `food` WHERE id=?');
+            $fid = (int)$this->GetParam('fid', $_REQUEST);
+            $stmt = $this->conn->prepare('SELECT sid,name,introduction,price,photo,special FROM `food` WHERE fid=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $fid);
             if (!$stmt->execute()) $this->InternalError();
@@ -462,6 +471,7 @@ sql
             $stmt->close();
             
             $this->ShopOwnerCheck($shopid, $uid);
+            
             $name = $this->GetParam('name', $_REQUEST, false, $name);
             $introduction = $this->GetParam('introduction', $_REQUEST, false, $introduction);
             $price_t = $this->GetParam('price', $_REQUEST, false);
@@ -471,20 +481,19 @@ sql
             $photo_t = $this->GetUploadfile('photo', false);
             if ($photo_t) $photohash = $this->ImageSave($photo_t);
             
-            $stmt = $this->conn->prepare('UPDATE `food` SET shopid=?,name=?,introduction=?,price=?,photo=?,special=? WHERE id=?');
+            $stmt = $this->conn->prepare('UPDATE `food` SET name=?,introduction=?,price=?,photo=?,special=? WHERE fid=?');
             if (!$stmt) $this->InternalError();
-            $stmt->bind_param('issdsii', $shopid, $name, $introduction, $price, $photohash, $special, $fid);
+            $stmt->bind_param('ssdsii', $name, $introduction, $price, $photohash, $special, $fid);
             if (!$stmt->execute()) $this->InternalError();
             return array('result'=>1);
         }
         
         function MethodFoodComment() {
             $this->SessionCheck($_REQUEST);
-            $fid = (int)$this->GetParam('id', $_REQUEST);
+            $fid = (int)$this->GetParam('fid', $_REQUEST);
             $uid = (int)$this->GetParam('uid', $_REQUEST);
             $like = (int)$this->GetParam('like', $_REQUEST);
             $comment = $this->GetParam('comment', $_REQUEST);
-            $x = strlen($comment);
             if ($like != 1 && $like != 0) throw new FrException(1, 'Illegal `like` parameter');
             $liked = null;
             $disliked = null;
@@ -518,8 +527,8 @@ sql
         }
         
         function MethodFoodViewcomment() {
-            $fid = $this->GetParam('id', $_REQUEST);
-            $stmt = $this->conn->prepare('SELECT uid,user.name,user.avatar,liked,disliked,comment,UNIX_TIMESTAMP(time) AS time FROM `foodcmt` JOIN `user` ON user.id=foodcmt.uid WHERE foodcmt.fid=? ORDER BY time DESC');
+            $fid = $this->GetParam('fid', $_REQUEST);
+            $stmt = $this->conn->prepare('SELECT user.uid,user.name,user.avatar,liked,disliked,comment,UNIX_TIMESTAMP(time) AS time FROM `foodcmt` JOIN `user` ON user.uid=foodcmt.uid WHERE foodcmt.fid=? ORDER BY time DESC');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $fid);
             if (!$stmt->execute()) $this->InternalError($stmt);
@@ -531,7 +540,7 @@ sql
                     $like = true;
                 else
                     $like = false;
-                $comments[] = array('user'=>array('id'=>$uid, 'name'=>$name, 'avatar'=>$avatar), 'like'=>$like, 'comment'=>$comment, 'time'=>$time);
+                $comments[] = array('user'=>array('uid'=>$uid, 'name'=>$name, 'avatar'=>$avatar), 'like'=>$like, 'comment'=>$comment, 'time'=>$time);
             }
             $stmt->close();
             return array('result'=>1, 'comments'=>$comments);
@@ -539,18 +548,18 @@ sql
         
         function MethodShopMark() {
             $this->SessionCheck($_REQUEST);
-            $shopid = (int)$this->GetParam('id', $_REQUEST);
+            $shopid = (int)$this->GetParam('sid', $_REQUEST);
             $uid = (int)$this->GetParam('uid', $_REQUEST);
             $mark = (int)$this->GetParam('mark', $_REQUEST);
             if ($mark < 0 || $mark > 10) throw new FrException(-1, 'Mark out of range');
             
-            $stmt = $this->conn->prepare('DELETE FROM `shopmark` WHERE shopid=? AND uid=?');
+            $stmt = $this->conn->prepare('DELETE FROM `shopmark` WHERE sid=? AND uid=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('ii', $shopid, $uid);
             if (!$stmt->execute()) $this->InternalError();
             $stmt->close();
             
-            $stmt = $this->conn->prepare('INSERT INTO `shopmark` (shopid,uid,mark) VALUES (?,?,?);');
+            $stmt = $this->conn->prepare('INSERT INTO `shopmark` (sid,uid,mark) VALUES (?,?,?);');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('iii', $shopid, $uid, $mark);
             if (!$stmt->execute()) {
@@ -562,7 +571,7 @@ sql
             }
             $stmt->close();
             
-            $stmt = $this->conn->prepare('SELECT AVG(mark) FROM `shopmark` WHERE shopid=?');
+            $stmt = $this->conn->prepare('SELECT AVG(mark) FROM `shopmark` WHERE sid=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $shopid);
             if (!$stmt->execute()) $this->InternalError();
@@ -579,7 +588,7 @@ sql
             $shopid = (int)$this->GetParam('id', $_REQUEST);
             
             // Fetch general information
-            $stmt = $this->conn->prepare('SELECT name,address,introduction,photo,phonenum,shopavg.mark,shopavg.popularity FROM `shop` LEFT JOIN (SELECT shopid,COUNT(*) AS popularity, AVG(mark) AS mark FROM `shopmark` GROUP BY shopid) shopavg ON shopavg.shopid=shop.id WHERE shop.id=?');
+            $stmt = $this->conn->prepare('SELECT name,address,introduction,photo,phonenum,shopavg.mark,shopavg.popularity FROM `shop` LEFT JOIN (SELECT sid,COUNT(*) AS popularity, AVG(mark) AS mark FROM `shopmark` GROUP BY sid) shopavg ON shopavg.sid=shop.sid WHERE shop.sid=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $shopid);
             if (!$stmt->execute()) $this->InternalError();
@@ -588,7 +597,7 @@ sql
             $stmt->close();
             
             // Fetch current user's mark
-            $stmt = $this->conn->prepare('SELECT mark FROM `shopmark` WHERE shopid=? AND uid=?');
+            $stmt = $this->conn->prepare('SELECT mark FROM `shopmark` WHERE sid=? AND uid=?');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('ii', $shopid, $uid);
             if (!$stmt->execute()) $this->InternalError();
