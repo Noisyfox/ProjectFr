@@ -211,10 +211,10 @@ sql
             if (!$stmt->execute()) $this->InternalError();
         }
         
-        function ShopOwnerCheck($shopid, $uid) {
+        function ShopOwnerCheck($sid, $uid) {
             $stmt = $this->conn->prepare('SELECT sid FROM `shop` WHERE sid=? AND uid=?');
             if (!$stmt) $this->InternalError();
-            $stmt->bind_param('ii', $shopid, $uid);
+            $stmt->bind_param('ii', $sid, $uid);
             if (!$stmt->execute()) $this->InternalError();
             if (!$stmt->fetch()) throw new FrException(-1, 'Not shopowner');
             $stmt->close();
@@ -328,11 +328,11 @@ sql
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $uid);
             if (!$stmt->execute()) $this->InternalError();
-            $stmt->bind_result($name,$sex,$type,$avatar,$school,$region,$shopid);
+            $stmt->bind_result($name,$sex,$type,$avatar,$school,$region,$sid);
             if (!$stmt->fetch()) throw new FrException(5, 'No such user');
             $stmt->close();
             $result = array('result'=>1, 'uid'=>$uid, 'session'=>$newses, 'sex'=>$sex, 'type'=>$type, 'avatar'=>$avatar, 'school'=>$school, 'region'=>$region);
-            if ($result['type'] == 1) $result['sid'] = $shopid;
+            if ($result['type'] == 1) $result['sid'] = $sid;
             return $result;
         }
         
@@ -440,8 +440,8 @@ sql
         function MethodFoodCreate() {
             $this->SessionCheck($_REQUEST, true);
             $uid = (int)$this->GetParam('uid', $_REQUEST);
-            $shopid = (int)$this->GetParam('sid', $_REQUEST);
-            $this->ShopOwnerCheck($shopid, $uid);
+            $sid = (int)$this->GetParam('sid', $_REQUEST);
+            $this->ShopOwnerCheck($sid, $uid);
             $name = $this->GetParam('name', $_REQUEST);
             $introduction = $this->GetParam('introduction', $_REQUEST);
             $price = (float)$this->GetParam('price', $_REQUEST);
@@ -450,7 +450,7 @@ sql
             
             $stmt = $this->conn->prepare('INSERT INTO `food` (sid,name,introduction,price,photo,special) VALUES (?,?,?,?,?,?);');
             if (!$stmt) $this->InternalError();
-            $stmt->bind_param('issdsi', $shopid, $name, $introduction, $price, $photohash, $special);
+            $stmt->bind_param('issdsi', $sid, $name, $introduction, $price, $photohash, $special);
             if (!$stmt->execute()) $this->InternalError();
             $stmt->close();
             
@@ -466,11 +466,11 @@ sql
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('i', $fid);
             if (!$stmt->execute()) $this->InternalError();
-            $stmt->bind_result($shopid, $name, $introduction, $price, $photohash, $special);
+            $stmt->bind_result($sid, $name, $introduction, $price, $photohash, $special);
             if (!$stmt->fetch()) throw new FrException(5, 'No such food');
             $stmt->close();
             
-            $this->ShopOwnerCheck($shopid, $uid);
+            $this->ShopOwnerCheck($sid, $uid);
             
             $name = $this->GetParam('name', $_REQUEST, false, $name);
             $introduction = $this->GetParam('introduction', $_REQUEST, false, $introduction);
@@ -548,20 +548,20 @@ sql
         
         function MethodShopMark() {
             $this->SessionCheck($_REQUEST);
-            $shopid = (int)$this->GetParam('sid', $_REQUEST);
+            $sid = (int)$this->GetParam('sid', $_REQUEST);
             $uid = (int)$this->GetParam('uid', $_REQUEST);
             $mark = (int)$this->GetParam('mark', $_REQUEST);
             if ($mark < 0 || $mark > 10) throw new FrException(-1, 'Mark out of range');
             
             $stmt = $this->conn->prepare('DELETE FROM `shopmark` WHERE sid=? AND uid=?');
             if (!$stmt) $this->InternalError();
-            $stmt->bind_param('ii', $shopid, $uid);
+            $stmt->bind_param('ii', $sid, $uid);
             if (!$stmt->execute()) $this->InternalError();
             $stmt->close();
             
             $stmt = $this->conn->prepare('INSERT INTO `shopmark` (sid,uid,mark) VALUES (?,?,?);');
             if (!$stmt) $this->InternalError();
-            $stmt->bind_param('iii', $shopid, $uid, $mark);
+            $stmt->bind_param('iii', $sid, $uid, $mark);
             if (!$stmt->execute()) {
                 // Foreign key constraint fails(no such shop)
                 if ($stmt->errno == 1452)
@@ -573,7 +573,7 @@ sql
             
             $stmt = $this->conn->prepare('SELECT AVG(mark) FROM `shopmark` WHERE sid=?');
             if (!$stmt) $this->InternalError();
-            $stmt->bind_param('i', $shopid);
+            $stmt->bind_param('i', $sid);
             if (!$stmt->execute()) $this->InternalError();
             $stmt->bind_result($average);
             if (!$stmt->fetch()) $this->InternalError();
@@ -585,27 +585,38 @@ sql
         function MethodShopDetail() {
             $this->SessionCheck($_REQUEST);
             $uid = (int)$this->GetParam('uid', $_REQUEST);
-            $shopid = (int)$this->GetParam('id', $_REQUEST);
+            $sid = (int)$this->GetParam('sid', $_REQUEST);
             
             // Fetch general information
-            $stmt = $this->conn->prepare('SELECT name,address,introduction,photo,phonenum,shopavg.mark,shopavg.popularity FROM `shop` LEFT JOIN (SELECT sid,COUNT(*) AS popularity, AVG(mark) AS mark FROM `shopmark` GROUP BY sid) shopavg ON shopavg.sid=shop.sid WHERE shop.sid=?');
+            $stmt = $this->conn->prepare('SELECT name,address,introduction,photo,phonenum,IFNULL(shopavg.mark, 0),IFNULL(shopavg.popularity, 0) FROM `shop` LEFT JOIN (SELECT sid,COUNT(*) AS popularity, AVG(mark) AS mark FROM `shopmark` WHERE sid=? GROUP BY sid) shopavg ON shopavg.sid=shop.sid WHERE shop.sid=?');
             if (!$stmt) $this->InternalError();
-            $stmt->bind_param('i', $shopid);
-            if (!$stmt->execute()) $this->InternalError();
-            $stmt->bind_result($name, $address, $introduction, $photo, $phonenum, $mark, $popularity);
+            $stmt->bind_param('ii', $sid, $sid);
+            if (!$stmt->execute()) $this->InternalError($stmt);
+            $stmt->bind_result($shop_name, $address, $shop_introduction, $shop_photo, $phonenum, $mark, $popularity);
             if (!$stmt->fetch()) throw new FrException(5, 'No such shop');
             $stmt->close();
             
             // Fetch current user's mark
             $stmt = $this->conn->prepare('SELECT mark FROM `shopmark` WHERE sid=? AND uid=?');
             if (!$stmt) $this->InternalError();
-            $stmt->bind_param('ii', $shopid, $uid);
-            if (!$stmt->execute()) $this->InternalError();
+            $stmt->bind_param('ii', $sid, $uid);
+            if (!$stmt->execute()) $this->InternalError($stmt);
             $stmt->bind_result($user_mark);
             if (!$stmt->fetch()) $user_mark = -1;
             $stmt->close();
             
+            // Fetch foods
+            $stmt = $this->conn->prepare('SELECT food.fid,name,price,special,photo,food_stat.likes,food_stat.dislikes,food_stat.comments, NOT ISNULL(bookmark.fid) AS bookmarked FROM `food` LEFT JOIN (SELECT fid,COUNT(liked) as likes, COUNT(disliked) AS dislikes, COUNT(comment) AS comments FROM `foodcmt` GROUP BY fid) food_stat ON food_stat.fid=food.fid LEFT JOIN (SELECT fid FROM `bookmark_food` WHERE uid=?) bookmark ON bookmark.fid=food.fid WHERE food.sid=?');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('ii', $uid, $sid);
+            if (!$stmt->execute()) $this->InternalError($stmt);
+            $result = array();
+            $stmt->bind_result($fid, $name, $price, $special, $photo, $likes, $dislikes, $comments, $bookmarked);
+            while ($stmt->fetch()) {
+                $result[] = array('fid'=>$fid, 'name'=>$name, 'price'=>(float)$price, 'special'=>(bool)$special, 'photo'=>$photo, 'likes'=>$likes, 'dislikes'=>$dislikes, 'comments'=>$comments, 'bookmarked'=>(bool)$bookmarked);
+            }
             
+            return array('result'=>1, 'name'=>$shop_name, 'address'=>$address, 'introduction'=>$shop_introduction, 'photo'=>$shop_photo, 'phonenum'=>$phonenum, 'mark'=>(float)$mark, 'popularity'=>$popularity, 'user_mark'=>$user_mark, 'foods'=>$result);
         }
         
         function MethodBookmarkAdd() {

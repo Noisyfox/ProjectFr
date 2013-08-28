@@ -146,6 +146,16 @@
             </form>
         </div>
         <div>
+            <p>Shop Detail</p>
+            <form action="rest.php" method="post" enctype="multipart/form-data">
+                Method: <input name="method" type="text" value="shop.detail" /><br />
+                UID: <input name="uid" type="text" value="1" /><br />
+                Session: <input name="session" type="text" /><br />
+                Shop id: <input name="sid" type="text" value="1" /><br />
+                <input type="submit" value="Submit" />
+            </form>
+        </div>
+        <div>
             <p>Food Create</p>
             <form action="rest.php" method="post" enctype="multipart/form-data">
                 Method: <input name="method" type="text" value="food.create" /><br />
