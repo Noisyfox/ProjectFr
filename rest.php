@@ -234,7 +234,7 @@
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('ii', $sid, $uid);
             if (!$stmt->execute()) $this->InternalError();
-            if (!$stmt->fetch()) throw new FrException(-1, 'Not shopowner');
+            if (!$stmt->fetch()) throw new FrException(22, 'Not shopowner');
             $stmt->close();
         }
         
@@ -812,6 +812,59 @@
             return array('result'=>1, 'comments'=>$comments);
         }
         
+        function MethodBookmarkList() {
+            $this->SessionCheck($_REQUEST);
+            $uid = (int)$this->GetParam('uid', $_REQUEST);
+            $type = $this->GetParam('type', $_REQUEST);
+            if ($type == 'food') {
+                $stmt = $this->conn->prepare('
+                    SELECT bookmark.id, bookmark.fid, food.name, food.price,
+                        food.special, food.photo, food.sid, shop.name
+                    FROM `bookmark_food` AS bookmark
+                    JOIN `food` ON food.fid=bookmark.fid
+                    JOIN `shop` ON shop.sid=food.sid
+                    WHERE bookmark.uid = ?');
+                if (!$stmt) $this->InternalError();
+                $stmt->bind_param('i', $uid);
+                if (!$stmt->execute()) $this->InternalError($stmt);
+                $stmt->bind_result($id, $fid, $f_name, $price, $special, $photo, $sid, $s_name);
+                $result = array();
+                while ($stmt->fetch()) {
+                    $result[] = array(
+                        'id'=>$id,
+                        'fid'=>$fid,
+                        'name'=>$f_name,
+                        'price'=>(float)$price,
+                        'special'=>(bool)$special,
+                        'photo'=>$photo,
+                        'sid'=>$sid,
+                        'shopname'=>$s_name
+                    );
+                }
+                return array('result'=>1, 'bookmarks'=>$result);
+            } else if ($type == 'shop') {
+                $stmt = $this->conn->prepare('
+                    SELECT bookmark.id, bookmark.sid, shop.photo, shop.name
+                    FROM `bookmark_shop` AS bookmark
+                    JOIN `shop` ON shop.sid=bookmark.sid
+                    WHERE bookmark.uid=?');
+                if (!$stmt) $this->InternalError();
+                $stmt->bind_param('i', $uid);
+                if (!$stmt->execute()) $this->InternalError($stmt);
+                $stmt->bind_result($id, $sid, $photo, $name);
+                $result = array();
+                while ($stmt->fetch()) {
+                    $result[] = array(
+                        'id'=>$id,
+                        'sid'=>$sid,
+                        'photo'=>$photo,
+                        'name'=>$name
+                    );
+                }
+                return array('result'=>1, 'bookmarks'=>$result);
+            } else throw new FrException(1, 'Illegal bookmark type');
+        }
+        
         function MethodBookmarkAdd() {
             $this->SessionCheck($_REQUEST);
             $uid = (int)$this->GetParam('uid', $_REQUEST);
@@ -874,6 +927,8 @@
                     return $this->MethodFoodViewcomment();
                 case 'bookmark.add':
                     return $this->MethodBookmarkAdd();
+                case 'bookmark.list':
+                    return $this->MethodBookmarkList();
                 default:
                     throw new FrException(0x002, 'Parameter `method` is not valid');
             }

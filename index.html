@@ -227,5 +227,18 @@
                 <input type="submit" value="Submit" />
             </form>
         </div>
+        <div>
+            <p>Bookmark List</p>
+            <form action="rest.php" method="post" enctype="multipart/form-data">
+                Method: <input name="method" type="text" value="bookmark.list" /><br />
+                UID: <input name="uid" type="text" value="1" /><br />
+                Session: <input name="session" type="text" /><br />
+                Type: 
+                    <input name="type" type="radio" value="food">food
+                    <input name="type" type="radio" value="shop" checked>shop
+                    <br />
+                <input type="submit" value="Submit" />
+            </form>
+        </div>
     </body>
 </html>
