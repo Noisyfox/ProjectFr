@@ -58,6 +58,23 @@
             return array('result'=>1);
         }
         
+        function DatabaseExecute() {
+            $sqls = explode("\n", $this->GetParam('sql', $_REQUEST));
+            foreach($sqls as &$sql) {
+                if (!$this->conn->query($sql)) $this->InternalError();
+            }
+            if (!$this->conn->query($sql)) $this->InternalError();
+            return array('result'=>1);
+        }
+        
+        function DatabaseUploadImages() {
+            $images = explode(',',$this->GetParam('images', $_REQUEST));
+            foreach($images as &$img) {
+                $this->ImageSave($this->GetUploadfile($img));
+            }
+            return array('result'=>1);
+        }
+        
         function InitTable() {
             // $this->conn->query('CREATE TABLE IF NOT EXISTS `image` (`uid` CHAR(40) NOT NULL, `img` LONGBLOB, UNIQUE KEY `uid` (`uid`)) COLLATE utf8_general_ci;');
             if (!$this->conn->query('
@@ -826,6 +843,10 @@
                     return $this->MethodTest();
                 case 'database.reset':
                     return $this->DatabaseReset();
+                case 'database.execute':
+                    return $this->DatabaseExecute();
+                case 'database.imageupload':
+                    return $this->DatabaseUploadImages();
                 case 'image':
                     return $this->ImageGet();
                 case 'user.register':
