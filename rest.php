@@ -10,7 +10,7 @@
             $r = $this->getCode();
             $result = $r;
             if ($r >= 0) {
-                return $result = 0;
+                $result = 0;
             }
             return array(
                 'result'=>$result,
@@ -217,9 +217,9 @@
             $stmt->bind_result($type);
             $r = $stmt->fetch();
             $stmt->close();
-            if (!$r) throw new FrException(-1, 'Session Invalid');
+            if (!$r) throw new FrException(21, 'Session Invalid');
             if ($owner_required && $type != 1) 
-                throw new FrException(-1, 'Guest cannot operate shops');
+                throw new FrException(22, 'Guest cannot operate shops');
         }
         
         function SessionReset($uid) {
