@@ -8,13 +8,12 @@
         
         function JsonMessage() {
             $r = $this->getCode();
-            // if ($r < 0) {
-            //     return array('result'=>$r);
-            // }
-            // else {
-            //     return array('result'=>0);
-            // }
+            $result = $r;
+            if ($r >= 0) {
+                return $result = 0;
+            }
             return array(
+                'result'=>$result,
                 'error_code'=>$this->getCode(),
                 'error_message'=>$this->getMessage()
             );
@@ -881,7 +880,7 @@
         }
         
         function HandleRequest() {
-            $debug = 1;
+            $debug = (int)$this->GetParam('DEBUG', $_REQUEST, false, '1');
             if ($debug) {
                 $result = $this->MainHandler();
             } else {
