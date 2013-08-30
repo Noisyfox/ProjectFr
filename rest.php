@@ -887,6 +887,22 @@
             return array('result'=>1);
         }
         
+        function MethodBookmarkDelete() {
+            $this->SessionCheck($_REQUEST);
+            $uid = (int)$this->GetParam('uid', $_REQUEST);
+            $type = $this->GetParam('type', $_REQUEST);
+            $id = (int)$this->GetParam('id', $_REQUEST);
+            if ($type != 'food' && $type != 'shop')
+                throw new FrException(1, 'Illegal type parameter');
+            $stmt = $this->conn->prepare('DELETE FROM `bookmark_'.$type.'` WHERE id=? AND uid=?;');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('ii', $id, $uid);
+            if (!$stmt->execute()) $this->InternalError($stmt);
+            $r = $stmt->affected_rows;
+            $stmt->close();
+            return array('result'=>$r);
+        }
+        
         function MainHandler() {
             $this->Connect();
             $method = $this->GetParam('method', $_REQUEST);
@@ -929,6 +945,8 @@
                     return $this->MethodBookmarkAdd();
                 case 'bookmark.list':
                     return $this->MethodBookmarkList();
+                case 'bookmark.delete':
+                    return $this->MethodBookmarkDelete();
                 default:
                     throw new FrException(0x002, 'Parameter `method` is not valid');
             }
