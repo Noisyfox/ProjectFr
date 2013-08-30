@@ -13,8 +13,8 @@ class Test_0_Register(unittest.TestCase):
     def testNormalGuest(self):
         p = {
             'method': 'user.register',
-            'name': 'abc',
-            'password': 'def',
+            'name': 'unique'+config.RandStr(),
+            'password': config.RandStr(),
             'sex': 1,
             'type': 0,
             'avatar': open('img/b.jpg', 'rb'),
@@ -29,8 +29,8 @@ class Test_0_Register(unittest.TestCase):
     def testNormalOwner(self):
         p = {
             'method': 'user.register',
-            'name': 'def',
-            'password': 'abc',
+            'name': 'unique'+config.RandStr(),
+            'password': config.RandStr(),
             'sex': 1,
             'type': 1,
             'avatar': open('img/b.jpg', 'rb'),
@@ -43,15 +43,16 @@ class Test_0_Register(unittest.TestCase):
         self.assertIn('session', o)
     
     def testDuplicate(self):
+        uid,name,pwd,sex,ty,avatar,school,region,sid = random.choice(config.users)
         p = {
             'method': 'user.register',
-            'name': 'aaa',
-            'password': 'aaa',
-            'sex': 0,
-            'type': 1,
+            'name': name,
+            'password': config.RandStr(),
+            'sex': random.randint(0,2),
+            'type': random.randint(0,1),
             'avatar': open('img/a.jpg', 'rb'),
-            'school': 'a',
-            'region': 'a'
+            'school': config.RandStr(),
+            'region': config.RandStr()
         }
         o = config.call(p)
         self.assertEqual(o['result'], -1)

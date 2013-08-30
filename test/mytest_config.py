@@ -16,21 +16,21 @@ def sha1(t):
         return sha1(t.read())
 
 class config:
-    url = r'http://192.168.56.103/php/Fr/rest.php'
+    url = r'http://192.168.56.101/Fr/rest.php'
     hashpattern = r'[0-9a-f]{20,20}'
     
     images = ['img/a.jpg', 'img/b.jpg', 'img/c.jpg', 'img/d.jpg', 'img/_a.jpg', 'img/_b.jpg', 'img/_c.jpg', 'img/_d.jpg']
     
     users = [
-        #uid,name , pwd  ,sex,ty,avatar     , sch , reg ,sid
-        (1, 'aaa', 'aaa', 1, 1, 'img/a.jpg', 'UA', 'JS', 1),
-        (2, 'bbb', 'bbb', 2, 1, 'img/b.jpg', 'UA', 'JS', 2),
-        (3, 'ccc', 'ccc', 1, 1, 'img/c.jpg', 'UA', 'SH', 3),
-        (4, 'ddd', 'ddd', 2, 1, 'img/d.jpg', 'UB', 'SH', 4),
-        (5, 'eee', 'eee', 1, 0, 'img/a.jpg', 'UA', 'JS', 0),
-        (6, 'fff', 'fff', 0, 0, 'img/b.jpg', 'UA', 'SH', 0),
-        (7, 'ggg', 'ggg', 1, 0, 'img/c.jpg', 'UB', 'JS', 0),
-        (8, 'hhh', 'hhh', 2, 0, 'img/d.jpg', 'UB', 'SH', 0)
+        #uid,name , pwd       ,sex,ty,avatar     , sch , reg ,sid
+        (1, 'aaaa', sha1('aaaa'), 1, 1, 'img/a.jpg', 'UA', 'JS', 1),
+        (2, 'bbbb', sha1('bbbb'), 2, 1, 'img/b.jpg', 'UA', 'JS', 2),
+        (3, 'cccc', sha1('cccc'), 1, 1, 'img/c.jpg', 'UA', 'SH', 3),
+        (4, 'dddd', sha1('dddd'), 2, 1, 'img/d.jpg', 'UB', 'SH', 4),
+        (5, 'eeee', sha1('eeee'), 1, 0, 'img/a.jpg', 'UA', 'JS', 0),
+        (6, 'ffff', sha1('ffff'), 0, 0, 'img/b.jpg', 'UA', 'SH', 0),
+        (7, 'gggg', sha1('gggg'), 1, 0, 'img/c.jpg', 'UB', 'JS', 0),
+        (8, 'hhhh', sha1('hhhh'), 2, 0, 'img/d.jpg', 'UB', 'SH', 0)
     ]
     
     shops = [
@@ -50,6 +50,34 @@ class config:
         (2,  2,  5, 'bf-b',2.2,  'bfi-b','img/b.jpg',0),
         (3,  3,  6, 'cf-a',3.1,  'cfi-a','img/a.jpg',0),
         (3,  3,  7, 'cf-b',3.2,  'cfi-b','img/b.jpg',1)
+    ]
+    
+    bookmark_f = [
+        #id,u, f (id)
+        (1, 1, 1),
+        (2, 1, 2),
+        (3, 1, 3),
+        (4, 1, 4),
+        (5, 1, 7),
+        (6, 5, 1),
+        (7, 5, 2),
+        (8, 5, 6),
+        (9, 5, 7),
+        (10,5, 5),
+        (11,3, 6),
+        (12,4, 2),
+        (13,4, 5)
+    ]
+    
+    bookmark_s = [
+        #id,u, s (id)
+        (1, 1, 2),
+        (2, 1, 4),
+        (3, 3, 2),
+        (4, 4, 1),
+        (5, 4, 2),
+        (6, 4, 3),
+        (7, 4, 4)
     ]
     
     @staticmethod
@@ -101,6 +129,10 @@ class config:
         for uid,sid,fid,name,price,intro,photo,spec in self.foods:
             s += "INSERT INTO `food` (fid,sid,name,introduction,price,photo,special) values (%d,%d,'%s','%s',%.2f,'%s',%d)\n"%(
                 fid,sid,name,intro,price,sha1(open(photo,'rb')),spec)
+        for id, uid, fid in self.bookmark_f:
+            s += "INSERT INTO `bookmark_food` (id,uid,fid) values (%d,%d,%d);\n"%(id,uid,fid)
+        for id, uid, sid in self.bookmark_s:
+            s += "INSERT INTO `bookmark_shop` (id,uid,sid) values (%d,%d,%d);\n"%(id,uid,sid)
         s += 'COMMIT;'
         #print s
         
@@ -108,7 +140,7 @@ class config:
         req = urllib2.Request(self.url, d, h)
         r = urllib2.urlopen(req)
         t = r.read()
-        #print t
+        print t
         o = json.loads(t)
         if o['result'] != 1:
             raise Exception('Error: Adding records')
@@ -124,5 +156,5 @@ class config:
         return json.loads(r)
     
 if __name__ == '__main__':
-    config.InitDb()
+    config.InitDb(True)
     
