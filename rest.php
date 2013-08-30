@@ -281,6 +281,8 @@
             $region = $this->GetParam('region', $_REQUEST);
             $avatar_hash = $this->ImageSave($avatar_tmp);
             
+            if (strlen($name) < 4) throw new FrException(1, 'Name too short');
+            
             $stmt = $this->conn->prepare('
                 INSERT INTO `user` 
                     (name, password, sex, type, avatar, school, region)
@@ -657,7 +659,7 @@
             // Fetch foods
             $stmt = $this->conn->prepare('
                 SELECT food.fid,name,price,special,photo,
-                    food_stat.likes,food_stat.dislikes,food_stat.comments, 
+                    IFNULL(food_stat.likes,0),IFNULL(food_stat.dislikes,0),IFNULL(food_stat.comments,0), 
                     NOT ISNULL(bookmark.fid) AS bookmarked 
                 FROM `food` 
                 LEFT JOIN (
@@ -794,6 +796,50 @@
             }
             if (!$this->conn->query('COMMIT;')) $this->InternalError();
             return array('result'=>1, 'results'=>$result);
+        }
+        
+        function MethodFoodDetail() {
+            $this->SessionCheck($_REQUEST);
+            $uid = (int)$this->GetParam('uid', $_REQUEST);
+            $fid = (int)$this->GetParam('fid', $_REQUEST);
+            
+            $stmt = $this->conn->prepare('
+                SELECT food.fid,name,price,special,photo,
+                    IFNULL(food_stat.likes,0),IFNULL(food_stat.dislikes,0),IFNULL(food_stat.comments,0), 
+                    NOT ISNULL(bookmark.fid) AS bookmarked 
+                FROM `food` 
+                LEFT JOIN (
+                    SELECT fid, COUNT(liked) AS likes, 
+                        COUNT(disliked) AS dislikes, COUNT(comment) AS comments 
+                    FROM `foodcmt` 
+                    GROUP BY fid
+                ) food_stat ON food_stat.fid=food.fid 
+                LEFT JOIN (SELECT fid FROM `bookmark_food` WHERE uid=?) bookmark 
+                ON bookmark.fid=food.fid 
+                WHERE food.fid=?');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('ii', $uid, $fid);
+            if (!$stmt->execute()) $this->InternalError();
+            $stmt->bind_result(
+                $fid, $name, $price, $special, $photo, 
+                $likes, $dislikes, $comments, $bookmarked);
+            if (!$stmt->fetch()) {
+                // No record found
+                return array('result'=>0);
+            }
+            $stmt->close();
+            return array(
+                'result'=>1,
+                'fid'=>$fid, 
+                'name'=>$name, 
+                'price'=>(float)$price, 
+                'special'=>(bool)$special, 
+                'photo'=>$photo, 
+                'likes'=>$likes, 
+                'dislikes'=>$dislikes, 
+                'comments'=>$comments, 
+                'bookmarked'=>(bool)$bookmarked
+            );
         }
         
         function MethodFoodComment() {
@@ -1010,6 +1056,8 @@
                     return $this->MethodFoodModify();
                 case 'food.delete':
                     return $this->MethodFoodDelete();
+                case 'food.detail':
+                    return $this->MethodFoodDetail();
                 case 'food.comment':
                     return $this->MethodFoodComment();
                 case 'food.viewcomment':
