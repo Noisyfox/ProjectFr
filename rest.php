@@ -387,7 +387,8 @@
             $stmt->close();
             $result = array(
                 'result'=>1, 
-                'uid'=>$uid, 
+                'uid'=>$uid,
+                'name'=>$name,
                 'session'=>$newses, 
                 'sex'=>$sex, 
                 'type'=>$type, 
