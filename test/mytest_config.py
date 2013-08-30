@@ -16,7 +16,7 @@ def sha1(t):
         return sha1(t.read())
 
 class config:
-    url = r'http://192.168.56.101/Fr/rest.php'
+    url = r'http://192.168.56.103/php/Fr/rest.php'
     hashpattern = r'[0-9a-f]{20,20}'
     
     images = ['img/a.jpg', 'img/b.jpg', 'img/c.jpg', 'img/d.jpg', 'img/_a.jpg', 'img/_b.jpg', 'img/_c.jpg', 'img/_d.jpg']
@@ -66,7 +66,7 @@ class config:
         return s
     
     @classmethod
-    def InitDb(self, uploadimage = True):
+    def InitDb(self, uploadimage = False):
         t = urllib2.urlopen(self.url, 'method=database.reset').read()
         if t != '{"result":1}':
             raise Exeption('Error: Reset database')
@@ -96,7 +96,7 @@ class config:
                 self.UserSession(name),uid,ty);
         s += "INSERT INTO `session` (sid,uid,expire,type) VALUES ('test',1,DATE_SUB(NOW(), INTERVAL 1 HOUR), 0);\n"
         for uid, sid, name, addr, intro, photo, phone in self.shops:
-            s += "INSERT INTO `shop` (sid,uid,name,address,introduction,photo,phonenum) VALUES (%d,%d,'%s','%s','%s','%s','%s');\n"%(
+            s += "INSERT INTO `shop` (sid,uid,name,address,introduction,photo,phonenum,time) VALUES (%d,%d,'%s','%s','%s','%s','%s', NOW());\n"%(
                 sid, uid, name, addr, intro, sha1(open(photo,'rb')),phone)
         for uid,sid,fid,name,price,intro,photo,spec in self.foods:
             s += "INSERT INTO `food` (fid,sid,name,introduction,price,photo,special) values (%d,%d,'%s','%s',%.2f,'%s',%d)\n"%(

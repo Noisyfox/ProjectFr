@@ -1026,7 +1026,7 @@
         }
         
         function HandleRequest() {
-            $debug = (int)$this->GetParam('DEBUG', $_REQUEST, false, '1');
+            $debug = (int)$this->GetParam('DEBUG', $_REQUEST, false, '0');
             if ($debug) {
                 $result = $this->MainHandler();
             } else {
