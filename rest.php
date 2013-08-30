@@ -728,6 +728,29 @@
             return array('result'=>1);
         }
         
+        function MethodFoodDelete() {
+            $this->SessionCheck($_REQUEST);
+            $uid = (int)$this->GetParam('uid', $_REQUEST);
+            $sid = (int)$this->GetParam('sid', $_REQUEST);
+            $this->ShopOwnerCheck($sid, $uid);
+            $ids = explode(',', $this->GetParam('ids', $_REQUEST));
+            
+            $result = array();
+            if (!$this->conn->query('START TRANSACTION;')) $this->InternalError();
+            foreach ($ids as $id) {
+                $r = true;
+                $fid = (int)$id;
+                if (!$this->conn->query('
+                    DELETE FROM `food` WHERE fid='.$fid.' AND sid='.$sid.';')
+                    || $this->conn->affected_rows == 0) {
+                    $r = false;
+                }
+                $result[$fid] = $r;
+            }
+            if (!$this->conn->query('COMMIT;')) $this->InternalError();
+            return array('result'=>1, 'results'=>$result);
+        }
+        
         function MethodFoodComment() {
             $this->SessionCheck($_REQUEST);
             $fid = (int)$this->GetParam('fid', $_REQUEST);
@@ -938,6 +961,8 @@
                     return $this->MethodFoodCreate();
                 case 'food.modify':
                     return $this->MethodFoodModify();
+                case 'food.delete':
+                    return $this->MethodFoodDelete();
                 case 'food.comment':
                     return $this->MethodFoodComment();
                 case 'food.viewcomment':
