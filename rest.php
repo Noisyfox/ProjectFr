@@ -104,6 +104,7 @@
                     introduction TEXT,
                     photo CHAR(40),
                     phonenum VARCHAR(50),
+                    time DATETIME,
                     CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(uid)
                 ) DEFAULT CHARSET=UTF8;')) $this->InternalError();
             if (!$this->conn->query('
@@ -304,8 +305,8 @@
                 $blank = '';
                 $stmt = $this->conn->prepare('
                     INSERT INTO `shop` 
-                        (uid, name, address, introduction, photo, phonenum)
-                    VALUES (?, ?, ?, ?, ?, ?);');
+                        (uid, name, address, introduction, photo, phonenum, time)
+                    VALUES (?, ?, ?, ?, ?, ?, NOW());');
                 if (!$stmt) $this->InternalError();
                 $stmt->bind_param(
                     'isssss', 
@@ -459,8 +460,8 @@
             
             $stmt = $this->conn->prepare('
                 INSERT INTO `shop` 
-                    (uid, name, address, introduction, photo, phonenum)
-                VALUES (?, ?, ?, ?, ?, ?);');
+                    (uid, name, address, introduction, photo, phonenum, time)
+                VALUES (?, ?, ?, ?, ?, ?, NOW());');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param(
                 'issssss', 
@@ -501,7 +502,7 @@
             
             $stmt = $this->conn->prepare('
                 UPDATE shop 
-                SET name=?, address=?, introduction=?, photo=?, phonenum=? 
+                SET name=?, address=?, introduction=?, photo=?, phonenum=?, time=NOW() 
                 WHERE sid=?;');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param(
@@ -569,6 +570,50 @@
             $stmt->close();
             
             return array('result'=>1, 'newmark'=>$average);
+        }
+        
+        function MethodShopList() {
+            $this->SessionCheck($_REQUEST);
+            $uid = $this->GetParam('uid', $_REQUEST);
+            $region = $this->GetParam('region', $_REQUEST, false, '');
+            $school = $this->GetParam('school', $_REQUEST, false, '');
+            $order = $this->GetParam('order', $_REQUEST, false, 'newest');
+            
+            $region = '%'.$region.'%';
+            $school = '%'.$school.'%';
+            
+            $stmt = $this->conn->prepare('
+                SELECT shop.sid, shop.name, photo,
+                    IFNULL(shopscore.avgmark, -1) AS mark,
+                    IFNULL(shopscore.popularity, 0) AS popularity,
+                    NOT ISNULL(bookmark.id) AS bookmarked,
+                    user.region, user.school
+                FROM shop
+                LEFT JOIN (
+                    SELECT sid, AVG(mark) AS avgmark, COUNT(*) AS popularity
+                    FROM shopmark GROUP BY sid
+                    ) shopscore ON shopscore.sid=shop.sid
+                LEFT JOIN (
+                    SELECT id, sid FROM bookmark_shop WHERE uid=?
+                    ) bookmark ON bookmark.sid=shop.sid
+                JOIN user ON user.uid=shop.uid
+                WHERE user.region LIKE ? AND user.school LIKE ?');
+            if (!$stmt) $this->InternalError();
+            $stmt->bind_param('iss', $uid, $region, $school);
+            if (!$stmt->execute()) $this->InternalError($stmt);
+            
+            $stmt->bind_result($sid, $name, $photo, $mark, $popularity, $bookmarked, $region, $school);
+            $result = array();
+            while ($stmt->fetch()) {
+                $result[] = array(
+                    'sid'=>$sid,
+                    'name'=>$name,
+                    'bookmark'=>(bool)$bookmarked,
+                    'photo'=>$photo,
+                    'mark'=>(float)$mark
+                );
+            }
+            return array('result'=>1, 'shops'=>$result);
         }
         
         function MethodShopDetail() {
@@ -953,6 +998,8 @@
                     return $this->MethodShopModify();
                 //case 'shop.delete':
                 //    return $this->MethodShopDelete();
+                case 'shop.list':
+                    return $this->MethodShopList();
                 case 'shop.detail':
                     return $this->MethodShopDetail();
                 case 'shop.mark':
