@@ -658,7 +658,7 @@
             
             // Fetch foods
             $stmt = $this->conn->prepare('
-                SELECT food.fid,name,price,special,photo,
+                SELECT food.fid,food.sid,name,price,special,photo,
                     IFNULL(food_stat.likes,0),IFNULL(food_stat.dislikes,0),IFNULL(food_stat.comments,0), 
                     NOT ISNULL(bookmark.fid) AS bookmarked 
                 FROM `food` 
@@ -676,11 +676,12 @@
             if (!$stmt->execute()) $this->InternalError($stmt);
             $result = array();
             $stmt->bind_result(
-                $fid, $name, $price, $special, $photo, 
+                $fid, $sid, $name, $price, $special, $photo, 
                 $likes, $dislikes, $comments, $bookmarked);
             while ($stmt->fetch()) {
                 $result[] = array(
-                    'fid'=>$fid, 
+                    'fid'=>$fid,
+                    'sid'=>$sid,
                     'name'=>$name, 
                     'price'=>(float)$price, 
                     'special'=>(bool)$special, 
@@ -804,7 +805,7 @@
             $fid = (int)$this->GetParam('fid', $_REQUEST);
             
             $stmt = $this->conn->prepare('
-                SELECT food.fid,name,price,special,photo,
+                SELECT food.fid,food.sid,name,price,special,photo,
                     IFNULL(food_stat.likes,0),IFNULL(food_stat.dislikes,0),IFNULL(food_stat.comments,0), 
                     NOT ISNULL(bookmark.fid) AS bookmarked 
                 FROM `food` 
@@ -821,7 +822,7 @@
             $stmt->bind_param('ii', $uid, $fid);
             if (!$stmt->execute()) $this->InternalError();
             $stmt->bind_result(
-                $fid, $name, $price, $special, $photo, 
+                $fid, $sid, $name, $price, $special, $photo, 
                 $likes, $dislikes, $comments, $bookmarked);
             if (!$stmt->fetch()) {
                 // No record found
@@ -830,7 +831,8 @@
             $stmt->close();
             return array(
                 'result'=>1,
-                'fid'=>$fid, 
+                'fid'=>$fid,
+                'sid'=>$sid,
                 'name'=>$name, 
                 'price'=>(float)$price, 
                 'special'=>(bool)$special, 
