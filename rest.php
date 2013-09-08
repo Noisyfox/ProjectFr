@@ -610,7 +610,7 @@
                 $result[] = array(
                     'sid'=>$sid,
                     'name'=>$name,
-                    'bookmark'=>(bool)$bookmarked,
+                    'bookmarked'=>(bool)$bookmarked,
                     'photo'=>$photo,
                     'mark'=>(float)$mark
                 );
