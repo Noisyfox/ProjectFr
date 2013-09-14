@@ -670,7 +670,7 @@
             
             // Fetch foods
             $stmt = $this->conn->prepare('
-                SELECT food.fid,food.sid,name,price,special,photo,
+                SELECT food.fid,food.sid,name,price,price_delta,special,photo,
                     IFNULL(food_stat.likes,0),IFNULL(food_stat.dislikes,0),IFNULL(food_stat.comments,0), 
                     NOT ISNULL(bookmark.fid) AS bookmarked 
                 FROM `food` 
@@ -688,14 +688,15 @@
             if (!$stmt->execute()) $this->InternalError($stmt);
             $result = array();
             $stmt->bind_result(
-                $fid, $sid, $name, $price, $special, $photo, 
+                $fid, $sid, $name, $price, $price_delta, $special, $photo, 
                 $likes, $dislikes, $comments, $bookmarked);
             while ($stmt->fetch()) {
                 $result[] = array(
                     'fid'=>$fid,
                     'sid'=>$sid,
                     'name'=>$name, 
-                    'price'=>(float)$price, 
+                    'price'=>(float)$price,
+                    'price_delta'=>(float)$price_delta,
                     'special'=>(bool)$special, 
                     'photo'=>$photo, 
                     'likes'=>$likes, 
