@@ -124,10 +124,10 @@ class config:
                 self.UserSession(name),uid,ty);
         s += "INSERT INTO `session` (sid,uid,expire,type) VALUES ('test',1,DATE_SUB(NOW(), INTERVAL 1 HOUR), 0);\n"
         for uid, sid, name, addr, intro, photo, phone in self.shops:
-            s += "INSERT INTO `shop` (sid,uid,name,address,introduction,photo,phonenum,time) VALUES (%d,%d,'%s','%s','%s','%s','%s', NOW());\n"%(
+            s += "INSERT INTO `shop` (sid,uid,name,address,introduction,photo,phonenum,time,last_offer) VALUES (%d,%d,'%s','%s','%s','%s','%s', 0, 0);\n"%(
                 sid, uid, name, addr, intro, sha1(open(photo,'rb')),phone)
         for uid,sid,fid,name,price,intro,photo,spec in self.foods:
-            s += "INSERT INTO `food` (fid,sid,name,introduction,price,photo,special) values (%d,%d,'%s','%s',%.2f,'%s',%d)\n"%(
+            s += "INSERT INTO `food` (fid,sid,name,introduction,price,price_delta,photo,special) values (%d,%d,'%s','%s',%.2f,0,'%s',%d)\n"%(
                 fid,sid,name,intro,price,sha1(open(photo,'rb')),spec)
         for id, uid, fid in self.bookmark_f:
             s += "INSERT INTO `bookmark_food` (id,uid,fid) values (%d,%d,%d);\n"%(id,uid,fid)
