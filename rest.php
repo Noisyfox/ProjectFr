@@ -105,6 +105,7 @@
                     photo CHAR(40),
                     phonenum VARCHAR(50),
                     time DATETIME,
+                    last_offer DATETIME,
                     CONSTRAINT FOREIGN KEY(uid) REFERENCES `user`(uid)
                 ) DEFAULT CHARSET=UTF8;')) $this->InternalError();
             if (!$this->conn->query('
@@ -114,6 +115,7 @@
                     name VARCHAR(50),
                     introduction TEXT,
                     price DECIMAL(5,2),
+                    price_delta DECIMAL(5,2),
                     photo CHAR(40),
                     special BOOL,
                     CONSTRAINT FOREIGN KEY(sid) REFERENCES `shop`(sid)
@@ -462,8 +464,8 @@
             
             $stmt = $this->conn->prepare('
                 INSERT INTO `shop` 
-                    (uid, name, address, introduction, photo, phonenum, time)
-                VALUES (?, ?, ?, ?, ?, ?, NOW());');
+                    (uid, name, address, introduction, photo, phonenum, time, last_offer)
+                VALUES (?, ?, ?, ?, ?, ?, 0, 0);');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param(
                 'issssss', 
@@ -720,8 +722,8 @@
             
             $stmt = $this->conn->prepare('
                 INSERT INTO `food` 
-                    (sid, name, introduction, price, photo, special) 
-                VALUES (?, ?, ?, ?, ?, ?);');
+                    (sid, name, introduction, price, price_delta, photo, special) 
+                VALUES (?, ?, ?, ?, 0, ?, ?);');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param(
                 'issdsi', 
@@ -756,8 +758,12 @@
             
             $name = $this->GetParam('name', $_REQUEST, false, $name);
             $introduction = $this->GetParam('introduction', $_REQUEST, false, $introduction);
+            
+            $old_price = $price;
             $price_t = $this->GetParam('price', $_REQUEST, false);
             if ($price_t) $price = (float)$price_t;
+            $price_delta = $price - $old_price;
+            
             $special_t = $this->GetParam('special', $_REQUEST, false);
             if ($special_t != false) $special = (int)$special_t;
             $photo_t = $this->GetUploadfile('photo', false);
@@ -765,14 +771,25 @@
             
             $stmt = $this->conn->prepare('
                 UPDATE `food` 
-                SET name=?, introduction=?, price=?, photo=?, special=? 
+                SET name=?, introduction=?, price=?, price_delta=?, photo=?, special=? 
                 WHERE fid=?;');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param(
-                'ssdsii', 
-                $name, $introduction, $price, $photohash, $special, $fid
+                'ssddsii', 
+                $name, $introduction, $price, $price_delta, $photohash, $special, $fid
             );
             if (!$stmt->execute()) $this->InternalError();
+            $stmt->close();
+            
+            if ($price_delta < 0) {
+                // New price offer found
+                $stmt = $this->conn->prepare('UPDATE `shop` SET last_offer=NOW() WHERE sid=?');
+                if (!$stmt) $this->InternalError();
+                $stmt->bind_param('i', $sid);
+                if (!$stmt->execute()) $this->InternalError();
+                $stmt->close();
+            }
+            
             return array('result'=>1);
         }
         
@@ -805,7 +822,7 @@
             $fid = (int)$this->GetParam('fid', $_REQUEST);
             
             $stmt = $this->conn->prepare('
-                SELECT food.fid,food.sid,name,price,special,photo,
+                SELECT food.fid,food.sid,name,price,price_delta,special,photo,
                     IFNULL(food_stat.likes,0),IFNULL(food_stat.dislikes,0),IFNULL(food_stat.comments,0), 
                     NOT ISNULL(bookmark.fid) AS bookmarked 
                 FROM `food` 
@@ -822,7 +839,7 @@
             $stmt->bind_param('ii', $uid, $fid);
             if (!$stmt->execute()) $this->InternalError();
             $stmt->bind_result(
-                $fid, $sid, $name, $price, $special, $photo, 
+                $fid, $sid, $name, $price, $price_delta, $special, $photo, 
                 $likes, $dislikes, $comments, $bookmarked);
             if (!$stmt->fetch()) {
                 // No record found
@@ -834,7 +851,8 @@
                 'fid'=>$fid,
                 'sid'=>$sid,
                 'name'=>$name, 
-                'price'=>(float)$price, 
+                'price'=>(float)$price,
+                'price_delta'=>(float)$price_delta,
                 'special'=>(bool)$special, 
                 'photo'=>$photo, 
                 'likes'=>$likes, 
@@ -935,7 +953,7 @@
             $type = $this->GetParam('type', $_REQUEST);
             if ($type == 'food') {
                 $stmt = $this->conn->prepare('
-                    SELECT bookmark.id, bookmark.fid, food.name, food.price,
+                    SELECT bookmark.id, bookmark.fid, food.name, food.price, food.price_delta, 
                         food.special, food.photo, food.sid, shop.name
                     FROM `bookmark_food` AS bookmark
                     JOIN `food` ON food.fid=bookmark.fid
@@ -944,7 +962,7 @@
                 if (!$stmt) $this->InternalError();
                 $stmt->bind_param('i', $uid);
                 if (!$stmt->execute()) $this->InternalError($stmt);
-                $stmt->bind_result($id, $fid, $f_name, $price, $special, $photo, $sid, $s_name);
+                $stmt->bind_result($id, $fid, $f_name, $price, $price_delta, $special, $photo, $sid, $s_name);
                 $result = array();
                 while ($stmt->fetch()) {
                     $result[] = array(
@@ -952,6 +970,7 @@
                         'fid'=>$fid,
                         'name'=>$f_name,
                         'price'=>(float)$price,
+                        'price_delta'=>(float)$price_delta,
                         'special'=>(bool)$special,
                         'photo'=>$photo,
                         'sid'=>$sid,
