@@ -582,6 +582,14 @@
             $region = $this->GetParam('region', $_REQUEST, false, '');
             $school = $this->GetParam('school', $_REQUEST, false, '');
             $order = $this->GetParam('order', $_REQUEST, false, 'newest');
+            if ($order == 'newest') {
+                $orderkey = 'shop.time';
+            } else if ($order == 'activity') {
+                $orderkey = 'shop.last_offer';
+            } else if ($order == 'rank') {
+                $orderkey = 'sorting_mark';
+            } else throw new FrException(1, 'Unknown sorting');
+            echo "orderkey: $orderkey\n";
             
             $region = '%'.$region.'%';
             $school = '%'.$school.'%';
@@ -591,7 +599,8 @@
                     IFNULL(shopscore.avgmark, -1) AS mark,
                     IFNULL(shopscore.popularity, 0) AS popularity,
                     NOT ISNULL(bookmark.id) AS bookmarked,
-                    user.region, user.school
+                    user.region, user.school,
+                    IFNULL(shopscore.avgmark, 5) as sorting_mark
                 FROM shop
                 LEFT JOIN (
                     SELECT sid, AVG(mark) AS avgmark, COUNT(*) AS popularity
@@ -601,12 +610,13 @@
                     SELECT id, sid FROM bookmark_shop WHERE uid=?
                     ) bookmark ON bookmark.sid=shop.sid
                 JOIN user ON user.uid=shop.uid
-                WHERE user.region LIKE ? AND user.school LIKE ?');
+                WHERE user.region LIKE ? AND user.school LIKE ?
+                ORDER BY '.$orderkey.' DESC');
             if (!$stmt) $this->InternalError();
             $stmt->bind_param('iss', $uid, $region, $school);
             if (!$stmt->execute()) $this->InternalError($stmt);
             
-            $stmt->bind_result($sid, $name, $photo, $mark, $popularity, $bookmarked, $region, $school);
+            $stmt->bind_result($sid, $name, $photo, $mark, $popularity, $bookmarked, $region, $school, $sorting_mark);
             $result = array();
             while ($stmt->fetch()) {
                 $result[] = array(
