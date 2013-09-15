@@ -670,7 +670,7 @@
             
             // Fetch foods
             $stmt = $this->conn->prepare('
-                SELECT food.fid,food.sid,name,price,price_delta,special,photo,
+                SELECT food.fid,food.sid,name,introduction,price,price_delta,special,photo,
                     IFNULL(food_stat.likes,0),IFNULL(food_stat.dislikes,0),IFNULL(food_stat.comments,0), 
                     NOT ISNULL(bookmark.fid) AS bookmarked 
                 FROM `food` 
@@ -688,13 +688,14 @@
             if (!$stmt->execute()) $this->InternalError($stmt);
             $result = array();
             $stmt->bind_result(
-                $fid, $sid, $name, $price, $price_delta, $special, $photo, 
+                $fid, $sid, $name, $intro_f, $price, $price_delta, $special, $photo, 
                 $likes, $dislikes, $comments, $bookmarked);
             while ($stmt->fetch()) {
                 $result[] = array(
                     'fid'=>$fid,
                     'sid'=>$sid,
-                    'name'=>$name, 
+                    'name'=>$name,
+                    'introduction'=>$intro_f,
                     'price'=>(float)$price,
                     'price_delta'=>(float)$price_delta,
                     'special'=>(bool)$special, 
@@ -833,7 +834,7 @@
             $fid = (int)$this->GetParam('fid', $_REQUEST);
             
             $stmt = $this->conn->prepare('
-                SELECT food.fid,food.sid,name,price,price_delta,special,photo,
+                SELECT food.fid,food.sid,name,introduction,price,price_delta,special,photo,
                     IFNULL(food_stat.likes,0),IFNULL(food_stat.dislikes,0),IFNULL(food_stat.comments,0), 
                     NOT ISNULL(bookmark.fid) AS bookmarked 
                 FROM `food` 
@@ -850,7 +851,7 @@
             $stmt->bind_param('ii', $uid, $fid);
             if (!$stmt->execute()) $this->InternalError();
             $stmt->bind_result(
-                $fid, $sid, $name, $price, $price_delta, $special, $photo, 
+                $fid, $sid, $name, $introduction, $price, $price_delta, $special, $photo, 
                 $likes, $dislikes, $comments, $bookmarked);
             if (!$stmt->fetch()) {
                 // No record found
@@ -861,7 +862,8 @@
                 'result'=>1,
                 'fid'=>$fid,
                 'sid'=>$sid,
-                'name'=>$name, 
+                'name'=>$name,
+                'introduction'=>$introduction,
                 'price'=>(float)$price,
                 'price_delta'=>(float)$price_delta,
                 'special'=>(bool)$special, 
