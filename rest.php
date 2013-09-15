@@ -781,6 +781,8 @@
             $photo_t = $this->GetUploadfile('photo', false);
             if ($photo_t) $photohash = $this->ImageSave($photo_t);
             
+            var_dump($name);
+            
             $stmt = $this->conn->prepare('
                 UPDATE `food` 
                 SET name=?, introduction=?, price=?, price_delta=?, photo=?, special=? 
@@ -810,7 +812,7 @@
             $uid = (int)$this->GetParam('uid', $_REQUEST);
             $sid = (int)$this->GetParam('sid', $_REQUEST);
             $this->ShopOwnerCheck($sid, $uid);
-            $ids = explode(',', $this->GetParam('ids', $_REQUEST));
+            $ids = explode(',', $this->GetParam('fids', $_REQUEST));
             
             $result = array();
             if (!$this->conn->query('START TRANSACTION;')) $this->InternalError();
